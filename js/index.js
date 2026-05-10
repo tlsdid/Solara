@@ -4648,6 +4648,7 @@ function handleImportedPlaylistItems(rawItems) {
     });
 
     if (added > 0) {
+        savePlayerState();
         renderPlaylist();
     } else {
         updatePlaylistActionStates();

@@ -591,10 +591,9 @@ body.mobile-view.mobile-panel-open .mobile-panel {
 
 body.mobile-view .mobile-panel-header {
     display: grid;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: minmax(0, 1fr);
     align-items: center;
-    column-gap: 12px;
-    row-gap: 8px;
+    row-gap: 10px;
     color: #ffffff;
 }
 
@@ -608,16 +607,37 @@ body.mobile-view .mobile-panel-handle {
 }
 
 body.mobile-view .mobile-panel-actions {
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    justify-self: end;
+    justify-content: flex-end;
+    justify-self: stretch;
     gap: 8px;
+    min-width: 0;
+    width: 100%;
+}
+
+body.mobile-view .mobile-panel-header .playlist-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    width: 100%;
+    min-width: 0;
+}
+
+body.mobile-view .mobile-panel-header .playlist-tab {
+    width: 100%;
+    min-width: 0;
+    padding: 0 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 body.mobile-view .mobile-actions-group {
     display: inline-flex;
     align-items: center;
     gap: 6px;
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
 }
 
 body.mobile-view .mobile-actions-group[hidden] {
@@ -631,6 +651,8 @@ body.mobile-view .mobile-close-btn {
     justify-content: center;
     width: 38px;
     height: 38px;
+    flex: 0 0 38px;
+    box-sizing: border-box;
     border-radius: 50%;
     border: 1px solid rgba(255, 255, 255, 0.18);
     background: rgba(255, 255, 255, 0.08);
@@ -690,6 +712,10 @@ body.mobile-view .lyrics {
     min-height: 0;
 }
 
+body.mobile-view #mobileAddAllFavoritesBtn {
+    display: none !important;
+}
+
 body.mobile-view .custom-playlist-shell {
     min-height: 0;
 }
@@ -735,7 +761,7 @@ body.mobile-view .playlist-items {
 }
 
 body.mobile-view .playlist-items .playlist-item {
-    padding: 12px 148px 12px 18px;
+    padding: 12px 152px 12px 18px;
     white-space: normal;
     line-height: 1.35;
     min-height: 0;
@@ -755,21 +781,28 @@ body.mobile-view .playlist-items .playlist-item .playlist-item-favorite,
 body.mobile-view .playlist-items .playlist-item .playlist-item-download,
 body.mobile-view .playlist-items .playlist-item .playlist-item-remove,
 body.mobile-view .playlist-items .playlist-item .playlist-item-drag {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
     width: 28px;
     height: 28px;
+    min-width: 28px;
+    flex: 0 0 28px;
     border-radius: 8px;
+    opacity: 1;
+    box-sizing: border-box;
 }
 
 body.mobile-view .playlist-items .playlist-item .playlist-item-favorite {
-    right: 128px;
+    right: 132px;
 }
 
 body.mobile-view .playlist-items .playlist-item .playlist-item-download {
-    right: 88px;
+    right: 92px;
 }
 
 body.mobile-view .playlist-items .playlist-item .playlist-item-remove {
-    right: 48px;
+    right: 52px;
 }
 
 body.mobile-view .playlist-items .playlist-item .playlist-item-drag {
@@ -778,24 +811,30 @@ body.mobile-view .playlist-items .playlist-item .playlist-item-drag {
 }
 
 body.mobile-view .custom-playlists .playlist-items .playlist-item {
-    padding-right: 128px;
+    padding-right: 132px;
 }
 
 body.mobile-view .custom-playlist-item-download,
 body.mobile-view .custom-playlist-item-remove,
 body.mobile-view .custom-playlists .playlist-item-drag {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
     width: 28px;
     height: 28px;
+    min-width: 28px;
+    flex: 0 0 28px;
     border-radius: 8px;
     opacity: 1;
+    box-sizing: border-box;
 }
 
 body.mobile-view .custom-playlist-item-download {
-    right: 88px;
+    right: 92px;
 }
 
 body.mobile-view .custom-playlist-item-remove {
-    right: 48px;
+    right: 52px;
 }
 
 body.mobile-view .custom-playlists .playlist-item-drag {
@@ -822,7 +861,32 @@ body.mobile-view .playlist-items .playlist-item.current {
 }
 
 body.mobile-view .favorites .favorite-item-action {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    flex: 0 0 28px;
+    border-radius: 8px;
     opacity: 1;
+    box-sizing: border-box;
+}
+
+body.mobile-view .favorites .playlist-items .playlist-item {
+    padding-right: 152px;
+}
+
+body.mobile-view .favorites .favorite-item-action--add {
+    right: 132px;
+}
+
+body.mobile-view .favorites .favorite-item-action--download {
+    right: 92px;
+}
+
+body.mobile-view .favorites .favorite-item-action--remove {
+    right: 52px;
 }
 
 body.mobile-view .favorites .favorite-item-action:hover {
