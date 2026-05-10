@@ -517,8 +517,8 @@
     (function fitDesktopCanvas() {
         const DESIGN_WIDTH = 1200;
         const DESIGN_HEIGHT = 675;
-        const MIN_MARGIN = 12;
-        const SCALE_TWEAK = 0.92;
+        const MIN_MARGIN = 8;
+        const SCALE_TWEAK = 1;
 
         function applyDesktopScale() {
             if (window.__SOLARA_IS_MOBILE) return;
@@ -529,12 +529,17 @@
 
             const viewportWidth = window.visualViewport ? window.visualViewport.width : window.innerWidth;
             const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-            const availableWidth = Math.max(320, viewportWidth - MIN_MARGIN * 2);
-            const availableHeight = Math.max(240, viewportHeight - MIN_MARGIN * 2);
+
+            const availableWidth = Math.max(0, viewportWidth - MIN_MARGIN * 2);
+            const availableHeight = Math.max(0, viewportHeight - MIN_MARGIN * 2);
+
             const scale = Math.max(
-    0.18,
-    Math.min(availableWidth / DESIGN_WIDTH, availableHeight / DESIGN_HEIGHT) * SCALE_TWEAK
-);
+                0.18,
+                Math.min(
+                    availableWidth / DESIGN_WIDTH,
+                    availableHeight / DESIGN_HEIGHT
+                ) * SCALE_TWEAK
+            );
 
             document.documentElement.style.setProperty('--desktop-scale', String(scale));
             document.documentElement.style.setProperty('--desktop-shell-width', `${DESIGN_WIDTH * scale}px`);
@@ -549,6 +554,7 @@
 
         window.addEventListener('resize', applyDesktopScale);
         window.addEventListener('orientationchange', applyDesktopScale);
+
         if (window.visualViewport) {
             window.visualViewport.addEventListener('resize', applyDesktopScale);
             window.visualViewport.addEventListener('scroll', applyDesktopScale);

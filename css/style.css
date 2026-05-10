@@ -2177,3 +2177,8 @@ input[type="range"]:active::-moz-range-thumb {
     width: 100%;
     max-width: 220px;
 }
+
+/* Desktop proportional-scale shell. In mobile mode it stays transparent to the layout. */
+.desktop-scale-shell {
+    display: contents;
+}
