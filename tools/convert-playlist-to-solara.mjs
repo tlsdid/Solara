@@ -255,7 +255,7 @@ async function fetchNetEasePlaylist(id) {
     if (!response.ok) {
         throw new Error(`NetEase playlist request failed (${response.status})`);
     }
-    const data = await response.json();
+    const data = parseNetEaseJson(await response.text());
     if (!data || data.code !== 200 || !data.playlist) {
         throw new Error(`NetEase playlist request returned an invalid response: ${JSON.stringify(data).slice(0, 160)}`);
     }
@@ -271,8 +271,20 @@ async function fetchNetEaseSongDetails(ids) {
     if (!response.ok) {
         throw new Error(`NetEase song detail request failed (${response.status})`);
     }
-    const data = await response.json();
+    const data = parseNetEaseJson(await response.text());
     return Array.isArray(data.songs) ? data.songs : [];
+}
+
+function parseNetEaseJson(text) {
+    // NetEase picture ids are often 16-18 digit integers.
+    // JSON.parse turns them into imprecise JS Numbers, e.g.
+    // 109951164395451227 -> 109951164395451230, which makes Solara load wrong covers.
+    // Quote only unsafe-length numeric values before parsing so pic_id stays exact.
+    const protectedText = String(text).replace(
+        /("(?:id|pic|picId|picid|albumId|copyrightId|commentThreadId|trackNumberUpdateTime|subscribedCount|playCount|shareCount|commentCount)"\s*:\s*)(-?\d{16,})/g,
+        '$1"$2"',
+    );
+    return JSON.parse(protectedText);
 }
 
 function netEaseHeaders() {
@@ -368,7 +380,24 @@ function normalizeTrack(raw) {
     const id = firstString(raw.id, raw.songid, raw.songmid, raw.mid, raw.musicId);
     const album = normalizeAlbum(raw.album, raw.albumname, raw.albumName, raw.al);
     const artist = normalizeArtists(raw.artist, raw.artists, raw.singer, raw.singers, raw.ar);
-    const picId = firstString(raw.pic_id, raw.picId, raw.pic, raw.album?.picId, raw.album?.pic, raw.al?.pic_str, raw.al?.pic);
+    const picId = firstString(
+        raw.pic_id,
+        raw.picId_str,
+        raw.pic_id_str,
+        raw.pic_str,
+        raw.album?.picId_str,
+        raw.album?.pic_id_str,
+        raw.album?.pic_str,
+        raw.album?.picId,
+        raw.album?.pic,
+        raw.al?.picId_str,
+        raw.al?.pic_id_str,
+        raw.al?.pic_str,
+        raw.al?.picId,
+        raw.al?.pic,
+        raw.picId,
+        raw.pic,
+    );
     return { id, name, artist, album, picId };
 }
 

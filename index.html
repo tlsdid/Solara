@@ -448,15 +448,6 @@
                             >歌单</button>
                         </div>
                         <div class="playlist-actions-tray" role="group" aria-label="收藏列表操作">
-                            <button
-                                class="playlist-action-btn"
-                                id="addAllFavoritesBtn"
-                                type="button"
-                                title="全部添加到播放列表"
-                                aria-label="全部添加到播放列表"
-                            >
-                                <i class="fas fa-plus-circle" aria-hidden="true"></i>
-                            </button>
                             <input
                                 id="importFavoritesInput"
                                 class="playlist-import-input"
@@ -559,12 +550,12 @@
                             </button>
                         </div>
                     </div>
+                    <label class="library-search" aria-label="搜索当前歌单歌曲">
+                        <i class="fas fa-search" aria-hidden="true"></i>
+                        <input id="customPlaylistSearchInput" type="search" placeholder="搜索当前歌单" autocomplete="off" />
+                    </label>
                     <div class="custom-playlist-shell">
                         <div class="custom-playlist-selector" id="customPlaylistSelector" aria-label="自定义歌单"></div>
-                        <label class="library-search" aria-label="搜索当前歌单歌曲">
-                            <i class="fas fa-search" aria-hidden="true"></i>
-                            <input id="customPlaylistSearchInput" type="search" placeholder="搜索当前歌单" autocomplete="off" />
-                        </label>
                         <div class="playlist-scroll">
                             <div class="playlist-items" id="customPlaylistItems"></div>
                         </div>

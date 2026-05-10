@@ -735,7 +735,7 @@ body.mobile-view .playlist-items {
 }
 
 body.mobile-view .playlist-items .playlist-item {
-    padding: 12px 108px 12px 18px;
+    padding: 12px 148px 12px 18px;
     white-space: normal;
     line-height: 1.35;
     min-height: 0;
@@ -753,30 +753,37 @@ body.mobile-view .playlist-items .playlist-item:hover {
 
 body.mobile-view .playlist-items .playlist-item .playlist-item-favorite,
 body.mobile-view .playlist-items .playlist-item .playlist-item-download,
-body.mobile-view .playlist-items .playlist-item .playlist-item-remove {
+body.mobile-view .playlist-items .playlist-item .playlist-item-remove,
+body.mobile-view .playlist-items .playlist-item .playlist-item-drag {
     width: 28px;
     height: 28px;
     border-radius: 8px;
 }
 
 body.mobile-view .playlist-items .playlist-item .playlist-item-favorite {
-    right: 88px;
+    right: 128px;
 }
 
 body.mobile-view .playlist-items .playlist-item .playlist-item-download {
-    right: 48px;
+    right: 88px;
 }
 
 body.mobile-view .playlist-items .playlist-item .playlist-item-remove {
+    right: 48px;
+}
+
+body.mobile-view .playlist-items .playlist-item .playlist-item-drag {
     right: 12px;
+    opacity: 1;
 }
 
 body.mobile-view .custom-playlists .playlist-items .playlist-item {
-    padding-right: 88px;
+    padding-right: 128px;
 }
 
 body.mobile-view .custom-playlist-item-download,
-body.mobile-view .custom-playlist-item-remove {
+body.mobile-view .custom-playlist-item-remove,
+body.mobile-view .custom-playlists .playlist-item-drag {
     width: 28px;
     height: 28px;
     border-radius: 8px;
@@ -784,10 +791,14 @@ body.mobile-view .custom-playlist-item-remove {
 }
 
 body.mobile-view .custom-playlist-item-download {
-    right: 48px;
+    right: 88px;
 }
 
 body.mobile-view .custom-playlist-item-remove {
+    right: 48px;
+}
+
+body.mobile-view .custom-playlists .playlist-item-drag {
     right: 12px;
 }
 

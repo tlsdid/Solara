@@ -3017,6 +3017,11 @@ function setupInteractions() {
         };
 
         const handleClick = (event) => {
+            if (event.target.closest(".playlist-item-drag")) {
+                event.preventDefault();
+                event.stopPropagation();
+                return;
+            }
             const actionButton = event.target.closest("[data-playlist-action]");
             if (actionButton) {
                 handlePlaylistAction(event, actionButton);
@@ -3043,7 +3048,7 @@ function setupInteractions() {
             if (event.key !== "Enter" && event.key !== " ") {
                 return;
             }
-            if (event.target.closest("[data-playlist-action]")) {
+            if (event.target.closest("[data-playlist-action], .playlist-item-drag")) {
                 return;
             }
             const item = event.target.closest(".playlist-item");
@@ -3110,6 +3115,11 @@ function setupInteractions() {
         };
 
         const handleClick = (event) => {
+            if (event.target.closest(".playlist-item-drag")) {
+                event.preventDefault();
+                event.stopPropagation();
+                return;
+            }
             const actionButton = event.target.closest("[data-favorite-action]");
             if (actionButton) {
                 handleFavoriteAction(event, actionButton);
@@ -3130,6 +3140,9 @@ function setupInteractions() {
         };
 
         const handleKeydown = (event) => {
+            if (event.target.closest(".playlist-item-drag")) {
+                return;
+            }
             const actionButton = event.target.closest("[data-favorite-action]");
             if (actionButton) {
                 if (event.key === "Enter" || event.key === " ") {
@@ -3184,8 +3197,28 @@ function setupInteractions() {
             });
         }
 
+        if (dom.renameCustomPlaylistBtn) {
+            dom.renameCustomPlaylistBtn.addEventListener("click", (event) => {
+                event.preventDefault();
+                renameSelectedCustomPlaylist();
+            });
+        }
+
+        if (dom.deleteCustomPlaylistBtn) {
+            dom.deleteCustomPlaylistBtn.addEventListener("click", (event) => {
+                event.preventDefault();
+                deleteSelectedCustomPlaylist();
+            });
+        }
+
         if (dom.customPlaylistItems) {
             dom.customPlaylistItems.addEventListener("click", (event) => {
+                if (event.target.closest(".playlist-item-drag")) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    return;
+                }
+
                 const actionButton = event.target.closest("[data-custom-song-action]");
                 if (actionButton) {
                     event.preventDefault();
@@ -3251,6 +3284,8 @@ function setupInteractions() {
     initializePlaylistEventHandlers();
     initializeFavoritesEventHandlers();
     initializeCustomPlaylistEventHandlers();
+    initializeLibrarySearchHandlers();
+    initializeLibraryDragSortHandlers();
     updateQualityLabel();
     updatePlayPauseButton();
     const initialTime = state.currentList === "favorite"
@@ -5121,6 +5156,11 @@ function renderCustomPlaylists() {
 
     const playlists = ensureCustomPlaylistsArray();
     dom.customPlaylists.classList.toggle("empty", playlists.length === 0);
+    [dom.renameCustomPlaylistBtn, dom.deleteCustomPlaylistBtn].forEach((button) => {
+        if (button) {
+            button.disabled = playlists.length === 0;
+        }
+    });
 
     if (playlists.length === 0) {
         dom.customPlaylistSelector.innerHTML = "";
@@ -5464,7 +5504,8 @@ function updateFavoriteHighlight() {
         return;
     }
     const items = dom.favoriteItems.querySelectorAll(".playlist-item");
-    items.forEach((item, index) => {
+    items.forEach((item) => {
+        const index = Number(item.dataset.index);
         const isCurrent = state.currentList === "favorite" && index === state.currentFavoriteIndex;
         item.classList.toggle("current", isCurrent);
         item.setAttribute("aria-current", isCurrent ? "true" : "false");
@@ -5864,7 +5905,8 @@ async function playPlaylistSong(index) {
 function updatePlaylistHighlight() {
     if (!dom.playlistItems) return;
     const playlistItems = dom.playlistItems.querySelectorAll(".playlist-item");
-    playlistItems.forEach((item, index) => {
+    playlistItems.forEach((item) => {
+        const index = Number(item.dataset.index);
         const isCurrent = state.currentPlaylist === "playlist" && index === state.currentTrackIndex;
         item.classList.toggle("current", isCurrent);
         item.setAttribute("aria-current", isCurrent ? "true" : "false");
