@@ -411,6 +411,10 @@
                             </button>
                         </div>
                     </div>
+                    <label class="library-search" aria-label="搜索播放列表歌曲">
+                        <i class="fas fa-search" aria-hidden="true"></i>
+                        <input id="playlistSearchInput" type="search" placeholder="搜索播放列表" autocomplete="off" />
+                    </label>
                     <div class="playlist-scroll">
                         <div class="playlist-items" id="playlistItems"></div>
                     </div>
@@ -489,6 +493,10 @@
                             </button>
                         </div>
                     </div>
+                    <label class="library-search" aria-label="搜索收藏列表歌曲">
+                        <i class="fas fa-search" aria-hidden="true"></i>
+                        <input id="favoritesSearchInput" type="search" placeholder="搜索收藏列表" autocomplete="off" />
+                    </label>
                     <div class="playlist-scroll">
                         <div class="playlist-items" id="favoriteItems"></div>
                     </div>
@@ -531,10 +539,32 @@
                             >
                                 <i class="fas fa-plus" aria-hidden="true"></i>
                             </button>
+                            <button
+                                class="playlist-action-btn"
+                                id="renameCustomPlaylistBtn"
+                                type="button"
+                                title="重命名歌单"
+                                aria-label="重命名歌单"
+                            >
+                                <i class="fas fa-pen" aria-hidden="true"></i>
+                            </button>
+                            <button
+                                class="playlist-action-btn playlist-action-btn--clear"
+                                id="deleteCustomPlaylistBtn"
+                                type="button"
+                                title="删除歌单"
+                                aria-label="删除歌单"
+                            >
+                                <i class="fas fa-trash" aria-hidden="true"></i>
+                            </button>
                         </div>
                     </div>
                     <div class="custom-playlist-shell">
                         <div class="custom-playlist-selector" id="customPlaylistSelector" aria-label="自定义歌单"></div>
+                        <label class="library-search" aria-label="搜索当前歌单歌曲">
+                            <i class="fas fa-search" aria-hidden="true"></i>
+                            <input id="customPlaylistSearchInput" type="search" placeholder="搜索当前歌单" autocomplete="off" />
+                        </label>
                         <div class="playlist-scroll">
                             <div class="playlist-items" id="customPlaylistItems"></div>
                         </div>

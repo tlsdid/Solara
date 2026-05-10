@@ -1037,6 +1037,10 @@ body.dark-mode .playlist-action-btn {
     background: transparent;
 }
 
+#favorites .playlist-actions-tray {
+    margin-left: 16px;
+}
+
 .playlist-import-input {
     display: none;
 }
