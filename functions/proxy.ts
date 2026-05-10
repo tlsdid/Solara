@@ -85,6 +85,7 @@ async function proxyKuwoAudio(targetUrl: string, request: Request): Promise<Resp
 
 async function proxyApiRequest(url: URL, request: Request): Promise<Response> {
   const apiUrl = new URL(API_BASE_URL);
+
   url.searchParams.forEach((value, key) => {
     if (key === "target" || key === "callback") {
       return;
@@ -96,23 +97,51 @@ async function proxyApiRequest(url: URL, request: Request): Promise<Response> {
     return new Response("Missing types", { status: 400 });
   }
 
-  const upstream = await fetch(apiUrl.toString(), {
-    headers: {
-      "User-Agent": request.headers.get("User-Agent") ?? "Mozilla/5.0",
-      "Accept": "application/json",
-    },
-  });
+  try {
+    const upstream = await fetch(apiUrl.toString(), {
+      headers: {
+        "User-Agent": request.headers.get("User-Agent") ?? "Mozilla/5.0",
+        "Accept": "application/json,text/plain,*/*",
+      },
+    });
 
-  const headers = createCorsHeaders(upstream.headers);
-  if (!headers.has("Content-Type")) {
-    headers.set("Content-Type", "application/json; charset=utf-8");
+    const text = await upstream.text();
+
+    return new Response(
+      JSON.stringify({
+        ok: upstream.ok,
+        status: upstream.status,
+        statusText: upstream.statusText,
+        upstreamUrl: apiUrl.toString(),
+        contentType: upstream.headers.get("content-type"),
+        bodyPreview: text.slice(0, 1200),
+      }, null, 2),
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Access-Control-Allow-Origin": "*",
+          "Cache-Control": "no-store",
+        },
+      }
+    );
+  } catch (error: any) {
+    return new Response(
+      JSON.stringify({
+        error: "Proxy fetch failed",
+        upstreamUrl: apiUrl.toString(),
+        message: error?.message || String(error),
+      }, null, 2),
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Access-Control-Allow-Origin": "*",
+          "Cache-Control": "no-store",
+        },
+      }
+    );
   }
-
-  return new Response(upstream.body, {
-    status: upstream.status,
-    statusText: upstream.statusText,
-    headers,
-  });
 }
 
 export async function onRequest({ request }: { request: Request }): Promise<Response> {
