@@ -271,89 +271,102 @@ html.desktop-view .control-trailing #loadOnlineBtn {
     padding: 0 18px;
 }
 
-/* 修复电脑端封面卡片内容溢出：只影响桌面等比缩放画布 */
+/* 优化桌面端封面卡片：封面适度放大，文字不贴底 */
 html.desktop-view .cover-area {
     justify-content: flex-start !important;
-    gap: 10px !important;
-    padding: 16px !important;
+    gap: 8px !important;
+    padding: 14px 22px 16px !important;
     overflow: hidden !important;
 }
 
-/* 原来的 200px 在 1200×675 画布里太高，会挤压文字 */
+/* 封面尺寸：比原 180 大，但不挤压文字 */
 html.desktop-view .album-cover {
-    width: 180px !important;
-    height: 180px !important;
-    min-height: 180px !important;
+    width: 210px !important;
+    height: 210px !important;
+    min-height: 210px !important;
     aspect-ratio: 1 / 1 !important;
-    margin-bottom: 0 !important;
-    flex: 0 0 180px !important;
+    flex: 0 0 210px !important;
+    margin: 0 auto !important;
+    border-radius: 16px !important;
 }
 
-/* 保证封面图完整填充封面框 */
 html.desktop-view .album-cover img {
     width: 100% !important;
     height: 100% !important;
     object-fit: cover !important;
+    border-radius: 16px !important;
 }
 
-/* 文字区固定高度，避免被封面挤出去 */
+/* 文字区上移，避免贴到底部 */
 html.desktop-view .current-song-info {
     width: 100% !important;
-    min-height: 48px !important;
-    max-height: 48px !important;
-    flex: 0 0 48px !important;
+    min-height: 54px !important;
+    max-height: 54px !important;
+    flex: 0 0 54px !important;
+    margin-top: 0 !important;
     display: flex !important;
     flex-direction: column !important;
-    justify-content: center !important;
+    justify-content: flex-start !important;
     overflow: hidden !important;
 }
 
-/* 歌名居中，收藏按钮不再挤压文字 */
+/* 歌名居中，给右侧爱心留位置 */
 html.desktop-view .current-song-title-row {
     position: relative !important;
     width: 100% !important;
+    padding: 0 40px !important;
     margin-bottom: 2px !important;
-    padding: 0 32px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
     line-height: 1.2 !important;
 }
 
-/* 歌名不换行，不串行，超出省略 */
 html.desktop-view .current-song-title-row .current-song-title,
 html.desktop-view .current-song-title {
     display: block !important;
     max-width: 100% !important;
     min-width: 0 !important;
-    font-size: 15px !important;
-    line-height: 20px !important;
+    font-size: 18px !important;
+    line-height: 23px !important;
+    font-weight: 700 !important;
     text-align: center !important;
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
 }
 
-/* 收藏按钮固定在右侧，不参与文字排版 */
-html.desktop-view .current-song-title-row .current-favorite-btn {
+/* 爱心固定在右侧，不挤压歌名 */
+html.desktop-view .current-song-title-row .current-favorite-btn,
+html.desktop-view .current-favorite-btn {
     position: absolute !important;
-    right: 0 !important;
+    right: 8px !important;
     top: 50% !important;
     transform: translateY(-50%) !important;
-    width: 28px !important;
-    height: 28px !important;
-    flex: 0 0 28px !important;
+    width: 30px !important;
+    height: 30px !important;
+    flex: 0 0 30px !important;
 }
 
-/* 歌手名单独一行，不溢出 */
+/* 歌手名保证可见 */
 html.desktop-view .current-song-artist {
     display: block !important;
     width: 100% !important;
     max-width: 100% !important;
-    font-size: 13px !important;
-    line-height: 18px !important;
+    font-size: 15px !important;
+    line-height: 19px !important;
+    color: rgba(42, 60, 76, 0.86) !important;
+    opacity: 1 !important;
     text-align: center !important;
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
 }
+
+html.desktop-view.dark-mode .current-song-artist,
+html.desktop-view body.dark-mode .current-song-artist {
+    color: rgba(226, 235, 242, 0.88) !important;
+    opacity: 1 !important;
+}
+
+
