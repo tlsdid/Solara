@@ -2453,3 +2453,22 @@ html.desktop-view .notification.warning {
         background: rgba(243, 156, 18, 0.86) !important;
     }
 }
+
+/* 强化封面下方歌手名可读性，不改字体、不改布局 */
+.current-song-artist {
+    color: rgba(44, 62, 80, 0.82) !important;
+    opacity: 1 !important;
+    text-shadow: 0 1px 8px rgba(255, 255, 255, 0.22);
+}
+
+html.desktop-view .current-song-artist {
+    color: rgba(44, 62, 80, 0.86) !important;
+    opacity: 1 !important;
+}
+
+.dark-mode .current-song-artist,
+html.desktop-view.dark-mode .current-song-artist {
+    color: rgba(236, 240, 241, 0.84) !important;
+    opacity: 1 !important;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.28);
+}
