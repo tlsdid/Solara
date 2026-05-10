@@ -7,6 +7,10 @@ const dom = {
     playlistItems: document.getElementById("playlistItems"),
     favorites: document.getElementById("favorites"),
     favoriteItems: document.getElementById("favoriteItems"),
+    customPlaylists: document.getElementById("customPlaylists"),
+    customPlaylistSelector: document.getElementById("customPlaylistSelector"),
+    customPlaylistItems: document.getElementById("customPlaylistItems"),
+    createCustomPlaylistBtn: document.getElementById("createCustomPlaylistBtn"),
     lyrics: document.getElementById("lyrics"),
     lyricsScroll: document.getElementById("lyricsScroll"),
     lyricsContent: document.getElementById("lyricsContent"),
@@ -58,6 +62,8 @@ const dom = {
     mobileClearPlaylistBtn: document.getElementById("mobileClearPlaylistBtn"),
     mobilePlaylistActions: document.getElementById("mobilePlaylistActions"),
     mobileFavoritesActions: document.getElementById("mobileFavoritesActions"),
+    mobileCustomPlaylistActions: document.getElementById("mobileCustomPlaylistActions"),
+    mobileCreateCustomPlaylistBtn: document.getElementById("mobileCreateCustomPlaylistBtn"),
     mobileAddAllFavoritesBtn: document.getElementById("mobileAddAllFavoritesBtn"),
     mobileImportFavoritesBtn: document.getElementById("mobileImportFavoritesBtn"),
     mobileExportFavoritesBtn: document.getElementById("mobileExportFavoritesBtn"),
@@ -159,16 +165,21 @@ function updateMobileClearPlaylistVisibility() {
     button.setAttribute("aria-hidden", shouldShow ? "false" : "true");
 }
 
-function updateMobileLibraryActionVisibility(showFavorites) {
+function updateMobileLibraryActionVisibility(target) {
     if (!isMobileView) {
         return;
     }
     const playlistGroup = dom.mobilePlaylistActions;
     const favoritesGroup = dom.mobileFavoritesActions;
-    const showFavoritesGroup = Boolean(showFavorites);
+    const customGroup = dom.mobileCustomPlaylistActions;
+    const normalizedTarget = target === "favorites" || target === true
+        ? "favorites"
+        : target === "custom"
+            ? "custom"
+            : "playlist";
 
     if (playlistGroup) {
-        if (showFavoritesGroup) {
+        if (normalizedTarget !== "playlist") {
             playlistGroup.setAttribute("hidden", "");
             playlistGroup.setAttribute("aria-hidden", "true");
         } else {
@@ -178,12 +189,22 @@ function updateMobileLibraryActionVisibility(showFavorites) {
     }
 
     if (favoritesGroup) {
-        if (showFavoritesGroup) {
+        if (normalizedTarget === "favorites") {
             favoritesGroup.removeAttribute("hidden");
             favoritesGroup.setAttribute("aria-hidden", "false");
         } else {
             favoritesGroup.setAttribute("hidden", "");
             favoritesGroup.setAttribute("aria-hidden", "true");
+        }
+    }
+
+    if (customGroup) {
+        if (normalizedTarget === "custom") {
+            customGroup.removeAttribute("hidden");
+            customGroup.setAttribute("aria-hidden", "false");
+        } else {
+            customGroup.setAttribute("hidden", "");
+            customGroup.setAttribute("aria-hidden", "true");
         }
     }
 }
@@ -366,6 +387,9 @@ const STORAGE_KEYS_TO_SYNC = new Set([
     "currentFavoriteIndex",
     "favoritePlayMode",
     "favoritePlaybackTime",
+    "customPlaylists",
+    "selectedCustomPlaylistId",
+    "currentCustomTrackIndex",
     "searchSource",
     "lastSearchState.v1",
 ]);
@@ -681,6 +705,20 @@ const savedFavoriteSongs = (() => {
 
 const FAVORITE_EXPORT_VERSION = 1;
 
+const savedCustomPlaylists = (() => {
+    const stored = safeGetLocalStorage("customPlaylists");
+    const playlists = parseJSON(stored, []);
+    return Array.isArray(playlists) ? playlists : [];
+})();
+
+const savedSelectedCustomPlaylistId = safeGetLocalStorage("selectedCustomPlaylistId") || "";
+
+const savedCurrentCustomTrackIndex = (() => {
+    const stored = safeGetLocalStorage("currentCustomTrackIndex");
+    const index = Number.parseInt(stored, 10);
+    return Number.isInteger(index) && index >= 0 ? index : 0;
+})();
+
 const savedCurrentFavoriteIndex = (() => {
     const stored = safeGetLocalStorage("currentFavoriteIndex");
     const index = Number.parseInt(stored, 10);
@@ -702,7 +740,7 @@ const savedFavoritePlaybackTime = (() => {
 
 const savedCurrentList = (() => {
     const stored = safeGetLocalStorage("currentList");
-    return stored === "favorite" ? "favorite" : "playlist";
+    return ["favorite", "custom"].includes(stored) ? stored : "playlist";
 })();
 
 const savedCurrentTrackIndex = (() => {
@@ -758,8 +796,8 @@ const savedCurrentSong = (() => {
 
 const savedCurrentPlaylist = (() => {
     const stored = safeGetLocalStorage("currentPlaylist");
-    const playlists = ["playlist", "online", "search", "favorites"];
-    return playlists.includes(stored) ? stored : "playlist";
+    const playlists = ["playlist", "online", "search", "favorites", "custom"];
+    return playlists.includes(stored) || String(stored || "").startsWith("custom:") ? stored : "playlist";
 })();
 
 // API配置 - 修复API地址和请求方式
@@ -920,6 +958,9 @@ const state = {
     favoritePlayMode: savedFavoritePlayMode,
     favoriteLastNonRandomMode: savedFavoritePlayMode === "random" ? "list" : savedFavoritePlayMode,
     favoritePlaybackTime: savedFavoritePlaybackTime,
+    customPlaylists: savedCustomPlaylists,
+    selectedCustomPlaylistId: savedSelectedCustomPlaylistId,
+    currentCustomTrackIndex: savedCurrentCustomTrackIndex,
     playbackQuality: savedPlaybackQuality,
     volume: savedVolume,
     currentPlaybackTime: savedPlaybackTime,
@@ -952,6 +993,14 @@ if (state.currentList === "favorite" && (!Array.isArray(state.favoriteSongs) || 
 if (state.currentList === "favorite") {
     state.currentPlaylist = "favorites";
 }
+ensureCustomPlaylistsArray();
+if (state.currentList === "custom" && !getSelectedCustomPlaylist()) {
+    state.currentList = "playlist";
+    state.currentPlaylist = "playlist";
+}
+if (state.currentList === "custom" && getSelectedCustomPlaylist()) {
+    state.currentPlaylist = `custom:${state.selectedCustomPlaylistId}`;
+}
 state.favoriteSongs = ensureFavoriteSongsArray()
     .map((song) => sanitizeImportedSong(song) || song)
     .filter((song) => song && typeof song === "object");
@@ -961,6 +1010,7 @@ if (!Array.isArray(state.favoriteSongs) || state.favoriteSongs.length === 0) {
     state.currentFavoriteIndex = state.favoriteSongs.length - 1;
 }
 saveFavoriteState();
+saveCustomPlaylistState();
 
 async function bootstrapPersistentStorage() {
     try {
@@ -1026,7 +1076,7 @@ function applyPersistentSnapshotFromRemote(data) {
     }
 
     if (typeof data.currentList === "string") {
-        state.currentList = data.currentList === "favorite" ? "favorite" : "playlist";
+        state.currentList = ["favorite", "custom"].includes(data.currentList) ? data.currentList : "playlist";
         safeSetLocalStorage("currentList", state.currentList, { skipRemote: true });
     }
 
@@ -1081,6 +1131,27 @@ function applyPersistentSnapshotFromRemote(data) {
         }
     }
 
+    if (typeof data.customPlaylists === "string") {
+        const customPlaylists = parseJSON(data.customPlaylists, []);
+        if (Array.isArray(customPlaylists)) {
+            state.customPlaylists = customPlaylists;
+            safeSetLocalStorage("customPlaylists", data.customPlaylists, { skipRemote: true });
+        }
+    }
+
+    if (typeof data.selectedCustomPlaylistId === "string") {
+        state.selectedCustomPlaylistId = data.selectedCustomPlaylistId;
+        safeSetLocalStorage("selectedCustomPlaylistId", data.selectedCustomPlaylistId, { skipRemote: true });
+    }
+
+    if (typeof data.currentCustomTrackIndex === "string") {
+        const customIndex = Number.parseInt(data.currentCustomTrackIndex, 10);
+        if (Number.isInteger(customIndex) && customIndex >= 0) {
+            state.currentCustomTrackIndex = customIndex;
+            safeSetLocalStorage("currentCustomTrackIndex", data.currentCustomTrackIndex, { skipRemote: true });
+        }
+    }
+
     if (typeof data.searchSource === "string") {
         state.searchSource = normalizeSource(data.searchSource);
         safeSetLocalStorage("searchSource", state.searchSource, { skipRemote: true });
@@ -1102,8 +1173,10 @@ function applyPersistentSnapshotFromRemote(data) {
     updateVolumeSliderBackground(state.volume);
     updateVolumeIcon(state.volume);
 
+    ensureCustomPlaylistsArray();
     renderFavorites();
-    switchLibraryTab(state.currentList === "favorite" ? "favorites" : "playlist");
+    renderCustomPlaylists();
+    switchLibraryTab(state.currentList === "favorite" ? "favorites" : state.currentList === "custom" ? "custom" : "playlist");
     updatePlayModeUI();
     updateQualityLabel();
     updatePlayPauseButton();
@@ -1953,6 +2026,13 @@ function saveFavoriteState(options = {}) {
     safeSetLocalStorage("currentFavoriteIndex", String(state.currentFavoriteIndex), { skipRemote });
     safeSetLocalStorage("favoritePlayMode", state.favoritePlayMode, { skipRemote });
     safeSetLocalStorage("favoritePlaybackTime", String(state.favoritePlaybackTime || 0), { skipRemote });
+}
+
+function saveCustomPlaylistState(options = {}) {
+    const { skipRemote = false } = options;
+    safeSetLocalStorage("customPlaylists", JSON.stringify(state.customPlaylists), { skipRemote });
+    safeSetLocalStorage("selectedCustomPlaylistId", state.selectedCustomPlaylistId || "", { skipRemote });
+    safeSetLocalStorage("currentCustomTrackIndex", String(state.currentCustomTrackIndex || 0), { skipRemote });
 }
 
 // 调试日志函数
@@ -3067,6 +3147,65 @@ function setupInteractions() {
         dom.favoriteItems.addEventListener("keydown", handleKeydown);
     }
 
+    function initializeCustomPlaylistEventHandlers() {
+        if (dom.createCustomPlaylistBtn) {
+            dom.createCustomPlaylistBtn.addEventListener("click", (event) => {
+                event.preventDefault();
+                promptCreateCustomPlaylist();
+            });
+        }
+
+        if (dom.mobileCreateCustomPlaylistBtn) {
+            dom.mobileCreateCustomPlaylistBtn.addEventListener("click", (event) => {
+                event.preventDefault();
+                promptCreateCustomPlaylist();
+            });
+        }
+
+        if (dom.customPlaylistSelector) {
+            dom.customPlaylistSelector.addEventListener("click", (event) => {
+                const button = event.target.closest("[data-custom-playlist-id]");
+                if (!button) {
+                    return;
+                }
+                state.selectedCustomPlaylistId = button.dataset.customPlaylistId;
+                state.currentCustomTrackIndex = 0;
+                saveCustomPlaylistState();
+                renderCustomPlaylists();
+            });
+        }
+
+        if (dom.customPlaylistItems) {
+            dom.customPlaylistItems.addEventListener("click", (event) => {
+                const actionButton = event.target.closest("[data-custom-song-action]");
+                if (actionButton) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const index = Number(actionButton.dataset.index);
+                    if (Number.isNaN(index)) {
+                        return;
+                    }
+                    const action = actionButton.dataset.customSongAction;
+                    if (action === "download") {
+                        showQualityMenu(event, index, "custom");
+                    } else if (action === "remove") {
+                        removeCustomPlaylistSong(index);
+                    }
+                    return;
+                }
+
+                const item = event.target.closest(".playlist-item");
+                if (!item || !dom.customPlaylistItems.contains(item)) {
+                    return;
+                }
+                const index = Number(item.dataset.index);
+                if (!Number.isNaN(index)) {
+                    playCustomPlaylistSong(index);
+                }
+            });
+        }
+    }
+
     function applyTheme(isDark) {
         if (!state.themeDefaultsCaptured) {
             captureThemeDefaults();
@@ -3102,6 +3241,7 @@ function setupInteractions() {
     ensureQualityMenuPortal();
     initializePlaylistEventHandlers();
     initializeFavoritesEventHandlers();
+    initializeCustomPlaylistEventHandlers();
     updateQualityLabel();
     updatePlayPauseButton();
     const initialTime = state.currentList === "favorite"
@@ -3111,7 +3251,8 @@ function setupInteractions() {
     dom.currentTimeDisplay.textContent = formatTime(initialTime);
     updateProgressBarBackground(initialTime, Number(dom.progressBar.max));
     renderFavorites();
-    switchLibraryTab(state.currentList === "favorite" ? "favorites" : "playlist");
+    renderCustomPlaylists();
+    switchLibraryTab(state.currentList === "favorite" ? "favorites" : state.currentList === "custom" ? "custom" : "playlist");
     updatePlayModeUI();
 
     dom.playPauseBtn.addEventListener("click", togglePlayPause);
@@ -3245,7 +3386,7 @@ function setupInteractions() {
                 return;
             }
             tab.addEventListener("click", () => {
-                const target = tab.dataset.target === "favorites" ? "favorites" : "playlist";
+                const target = tab.dataset.target === "favorites" ? "favorites" : tab.dataset.target === "custom" ? "custom" : "playlist";
                 switchLibraryTab(target);
             });
         });
@@ -3773,9 +3914,20 @@ function createSearchResultItem(song, index) {
 
     downloadButton.appendChild(qualityMenu);
 
+    const addToCustomButton = document.createElement("button");
+    addToCustomButton.className = "action-btn add-to-custom";
+    addToCustomButton.type = "button";
+    addToCustomButton.title = "添加到歌单";
+    addToCustomButton.setAttribute("aria-label", "添加到歌单");
+    addToCustomButton.innerHTML = '<i class="fas fa-plus"></i>';
+    addToCustomButton.addEventListener("click", (event) => {
+        showCustomPlaylistPicker(event, song);
+    });
+
     actions.appendChild(favoriteButton);
     actions.appendChild(playButton);
     actions.appendChild(downloadButton);
+    actions.appendChild(addToCustomButton);
 
     item.appendChild(selectionToggle);
     item.appendChild(info);
@@ -4130,6 +4282,9 @@ async function downloadWithQuality(event, index, type, quality) {
         song = state.playlistSongs[index];
     } else if (type === "favorites") {
         song = state.favoriteSongs[index];
+    } else if (type === "custom") {
+        const playlist = getSelectedCustomPlaylist();
+        song = playlist && Array.isArray(playlist.items) ? playlist.items[index] : null;
     }
 
     if (!song) return;
@@ -4605,23 +4760,266 @@ function updateFavoriteIcons() {
     }
 }
 
+function createCustomPlaylistId() {
+    return `custom-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function ensureCustomPlaylistsArray() {
+    if (!Array.isArray(state.customPlaylists)) {
+        state.customPlaylists = [];
+    }
+
+    state.customPlaylists = state.customPlaylists
+        .filter((playlist) => playlist && typeof playlist === "object")
+        .map((playlist, index) => ({
+            id: typeof playlist.id === "string" && playlist.id ? playlist.id : createCustomPlaylistId(),
+            name: typeof playlist.name === "string" && playlist.name.trim() ? playlist.name.trim() : `歌单 ${index + 1}`,
+            items: Array.isArray(playlist.items)
+                ? playlist.items.map((song) => sanitizeImportedSong(song) || song).filter((song) => song && typeof song === "object")
+                : [],
+        }));
+
+    if (state.customPlaylists.length > 0 && !state.customPlaylists.some((playlist) => playlist.id === state.selectedCustomPlaylistId)) {
+        state.selectedCustomPlaylistId = state.customPlaylists[0].id;
+        state.currentCustomTrackIndex = 0;
+    }
+
+    if (state.customPlaylists.length === 0) {
+        state.selectedCustomPlaylistId = "";
+        state.currentCustomTrackIndex = 0;
+    }
+
+    return state.customPlaylists;
+}
+
+function getSelectedCustomPlaylist() {
+    const playlists = ensureCustomPlaylistsArray();
+    return playlists.find((playlist) => playlist.id === state.selectedCustomPlaylistId) || playlists[0] || null;
+}
+
+function findSongInCustomPlaylists(song) {
+    const key = getSongKey(song);
+    if (!key) {
+        return null;
+    }
+    return ensureCustomPlaylistsArray().find((playlist) =>
+        Array.isArray(playlist.items) && playlist.items.some((item) => getSongKey(item) === key)
+    ) || null;
+}
+
+function createCustomPlaylist(name) {
+    const trimmedName = typeof name === "string" ? name.trim() : "";
+    if (!trimmedName) {
+        return null;
+    }
+    const playlist = {
+        id: createCustomPlaylistId(),
+        name: trimmedName,
+        items: [],
+    };
+    ensureCustomPlaylistsArray().push(playlist);
+    state.selectedCustomPlaylistId = playlist.id;
+    state.currentCustomTrackIndex = 0;
+    saveCustomPlaylistState();
+    renderCustomPlaylists();
+    return playlist;
+}
+
+function promptCreateCustomPlaylist() {
+    const name = window.prompt("请输入歌单名称");
+    if (!name || !name.trim()) {
+        return null;
+    }
+    const playlist = createCustomPlaylist(name);
+    if (playlist) {
+        showNotification(`已创建歌单：${playlist.name}`, "success");
+    }
+    return playlist;
+}
+
+function addSongToCustomPlaylist(song, playlistId) {
+    const normalizedSong = sanitizeImportedSong(song) || song;
+    if (!normalizedSong) {
+        return { added: false, reason: "missing-target" };
+    }
+
+    const existingPlaylist = findSongInCustomPlaylists(normalizedSong);
+    if (existingPlaylist) {
+        return { added: false, reason: "duplicate", playlist: existingPlaylist };
+    }
+
+    const playlists = ensureCustomPlaylistsArray();
+    const playlist = playlists.find((item) => item.id === playlistId);
+    if (!playlist) {
+        return { added: false, reason: "missing-target" };
+    }
+
+    playlist.items.push(normalizedSong);
+    state.selectedCustomPlaylistId = playlist.id;
+    saveCustomPlaylistState();
+    renderCustomPlaylists();
+    return { added: true, playlist };
+}
+
+function removeCustomPlaylistSong(index) {
+    const playlist = getSelectedCustomPlaylist();
+    if (!playlist || !Array.isArray(playlist.items) || index < 0 || index >= playlist.items.length) {
+        return;
+    }
+    playlist.items.splice(index, 1);
+    if (state.currentList === "custom" && state.currentPlaylist === `custom:${playlist.id}`) {
+        if (playlist.items.length === 0) {
+            state.currentCustomTrackIndex = 0;
+            state.currentList = "playlist";
+            state.currentPlaylist = "playlist";
+        } else if (state.currentCustomTrackIndex >= playlist.items.length) {
+            state.currentCustomTrackIndex = playlist.items.length - 1;
+        }
+    }
+    saveCustomPlaylistState();
+    renderCustomPlaylists();
+    updatePlayModeUI();
+    showNotification("已从歌单移除", "success");
+}
+
+function renderCustomPlaylists() {
+    if (!dom.customPlaylists || !dom.customPlaylistSelector || !dom.customPlaylistItems) {
+        return;
+    }
+
+    const playlists = ensureCustomPlaylistsArray();
+    dom.customPlaylists.classList.toggle("empty", playlists.length === 0);
+
+    if (playlists.length === 0) {
+        dom.customPlaylistSelector.innerHTML = "";
+        dom.customPlaylistItems.innerHTML = '<div class="custom-playlist-empty">还没有歌单，点击右上角 + 新建</div>';
+        return;
+    }
+
+    dom.customPlaylistSelector.innerHTML = playlists.map((playlist) => {
+        const isActive = playlist.id === state.selectedCustomPlaylistId;
+        return `<button class="custom-playlist-chip${isActive ? " active" : ""}" type="button" data-custom-playlist-id="${playlist.id}">${playlist.name}<span>${playlist.items.length}</span></button>`;
+    }).join("");
+
+    const playlist = getSelectedCustomPlaylist();
+    const items = playlist?.items || [];
+
+    if (items.length === 0) {
+        dom.customPlaylistItems.innerHTML = `<div class="custom-playlist-empty">“${playlist.name}” 还没有歌曲</div>`;
+        return;
+    }
+
+    dom.customPlaylistItems.innerHTML = items.map((song, index) => {
+        const artistValue = Array.isArray(song.artist)
+            ? song.artist.join(", ")
+            : (song.artist || "未知艺术家");
+        const isCurrent = state.currentList === "custom"
+            && state.currentPlaylist === `custom:${playlist.id}`
+            && index === state.currentCustomTrackIndex;
+        return `
+        <div class="playlist-item${isCurrent ? " current" : ""}" data-index="${index}" role="button" tabindex="0" aria-label="播放 ${song.name}">
+            ${song.name} - ${artistValue}
+            <button class="custom-playlist-item-download" type="button" data-custom-song-action="download" data-index="${index}" title="下载" aria-label="下载">
+                <i class="fas fa-download"></i>
+            </button>
+            <button class="custom-playlist-item-remove" type="button" data-custom-song-action="remove" data-index="${index}" title="从歌单移除" aria-label="从歌单移除">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>`;
+    }).join("");
+}
+
+function showCustomPlaylistPicker(event, song) {
+    event.preventDefault();
+    event.stopPropagation();
+    closeCustomPlaylistPicker();
+
+    let playlists = ensureCustomPlaylistsArray();
+    if (playlists.length === 0) {
+        const created = promptCreateCustomPlaylist();
+        if (!created) {
+            return;
+        }
+        const result = addSongToCustomPlaylist(song, created.id);
+        showCustomPlaylistAddResult(result);
+        return;
+    }
+
+    const button = event.target.closest("button");
+    const rect = button.getBoundingClientRect();
+    const menu = document.createElement("div");
+    menu.className = "custom-playlist-picker";
+    menu.innerHTML = playlists.map((playlist) =>
+        `<button type="button" class="custom-playlist-picker__item" data-custom-playlist-id="${playlist.id}">${playlist.name}</button>`
+    ).join("") + '<button type="button" class="custom-playlist-picker__item custom-playlist-picker__item--create" data-create-custom-playlist="true">新建歌单</button>';
+
+    menu.style.position = "fixed";
+    menu.style.top = `${rect.bottom + 6}px`;
+    menu.style.left = `${Math.max(8, rect.left - 120)}px`;
+    menu.style.zIndex = "20000";
+
+    menu.addEventListener("click", (clickEvent) => {
+        clickEvent.preventDefault();
+        clickEvent.stopPropagation();
+        const createButton = clickEvent.target.closest("[data-create-custom-playlist]");
+        if (createButton) {
+            const playlist = promptCreateCustomPlaylist();
+            if (playlist) {
+                const result = addSongToCustomPlaylist(song, playlist.id);
+                showCustomPlaylistAddResult(result);
+            }
+            closeCustomPlaylistPicker();
+            return;
+        }
+
+        const option = clickEvent.target.closest("[data-custom-playlist-id]");
+        if (!option) {
+            return;
+        }
+        const result = addSongToCustomPlaylist(song, option.dataset.customPlaylistId);
+        showCustomPlaylistAddResult(result);
+        closeCustomPlaylistPicker();
+    });
+
+    document.body.appendChild(menu);
+    setTimeout(() => {
+        document.addEventListener("click", closeCustomPlaylistPicker, { once: true });
+    });
+}
+
+function showCustomPlaylistAddResult(result) {
+    if (result.added) {
+        showNotification(`已添加到歌单：${result.playlist.name}`, "success");
+    } else if (result.reason === "duplicate" && result.playlist) {
+        showNotification(`已存在于歌单：${result.playlist.name}`, "warning");
+    } else {
+        showNotification("无法添加到歌单", "error");
+    }
+}
+
+function closeCustomPlaylistPicker() {
+    document.querySelectorAll(".custom-playlist-picker").forEach((menu) => menu.remove());
+}
+
 function switchLibraryTab(target) {
-    const showFavorites = target === "favorites";
+    const normalizedTarget = target === "favorites" ? "favorites" : target === "custom" ? "custom" : "playlist";
+    const showFavorites = normalizedTarget === "favorites";
+    const showCustom = normalizedTarget === "custom";
 
     if (Array.isArray(dom.libraryTabs) && dom.libraryTabs.length > 0) {
         dom.libraryTabs.forEach((tab) => {
             if (!(tab instanceof HTMLElement)) {
                 return;
             }
-            const target = tab.dataset.target === "favorites" ? "favorites" : "playlist";
-            const isActive = showFavorites ? target === "favorites" : target === "playlist";
+            const target = tab.dataset.target === "favorites" ? "favorites" : tab.dataset.target === "custom" ? "custom" : "playlist";
+            const isActive = target === normalizedTarget;
             tab.classList.toggle("active", isActive);
             tab.setAttribute("aria-selected", isActive ? "true" : "false");
         });
     }
 
     if (dom.playlist) {
-        if (showFavorites) {
+        if (showFavorites || showCustom) {
             dom.playlist.classList.remove("active");
             dom.playlist.setAttribute("hidden", "");
         } else {
@@ -4640,7 +5038,21 @@ function switchLibraryTab(target) {
         }
     }
 
-    updateMobileLibraryActionVisibility(showFavorites);
+    if (dom.customPlaylists) {
+        if (showCustom) {
+            dom.customPlaylists.classList.add("active");
+            dom.customPlaylists.removeAttribute("hidden");
+            renderCustomPlaylists();
+        } else {
+            dom.customPlaylists.classList.remove("active");
+            dom.customPlaylists.setAttribute("hidden", "");
+        }
+    }
+
+    updateMobileLibraryActionVisibility(normalizedTarget);
+    if (isMobileView && document.body) {
+        document.body.setAttribute("data-mobile-panel-view", normalizedTarget);
+    }
     updateMobileClearPlaylistVisibility();
     closeImportSelectedMenu();
 }
@@ -4892,6 +5304,34 @@ async function playFavoriteSong(index) {
     } catch (error) {
         console.error("播放收藏歌曲失败:", error);
         showNotification("播放收藏歌曲失败", "error");
+    }
+}
+
+async function playCustomPlaylistSong(index) {
+    const playlist = getSelectedCustomPlaylist();
+    const items = playlist?.items || [];
+    if (!playlist || index < 0 || index >= items.length) {
+        return;
+    }
+
+    const song = items[index];
+    state.currentCustomTrackIndex = index;
+    state.selectedCustomPlaylistId = playlist.id;
+    state.currentList = "custom";
+    state.currentPlaylist = `custom:${playlist.id}`;
+
+    try {
+        await playSong(song);
+        renderCustomPlaylists();
+        updatePlayModeUI();
+        saveCustomPlaylistState();
+        savePlayerState();
+        if (isMobileView) {
+            closeMobilePanel();
+        }
+    } catch (error) {
+        console.error("播放歌单歌曲失败:", error);
+        showNotification("播放歌单歌曲失败", "error");
     }
 }
 
@@ -5435,6 +5875,27 @@ function playNext() {
         return;
     }
 
+    if (state.currentList === "custom") {
+        const playlist = getSelectedCustomPlaylist();
+        const items = playlist?.items || [];
+        if (items.length === 0) {
+            clearLyricsIfLibraryEmpty();
+            return;
+        }
+        const mode = state.playMode || "list";
+        let nextIndex = state.currentCustomTrackIndex;
+        if (mode === "random") {
+            nextIndex = Math.floor(Math.random() * items.length);
+        } else if (mode === "list") {
+            nextIndex = (state.currentCustomTrackIndex + 1) % items.length;
+        }
+        if (mode !== "single") {
+            state.currentCustomTrackIndex = nextIndex;
+        }
+        playCustomPlaylistSong(state.currentCustomTrackIndex);
+        return;
+    }
+
     let nextIndex = -1;
     let playlist = [];
 
@@ -5498,6 +5959,29 @@ function playPrevious() {
             state.currentFavoriteIndex = prevIndex;
         }
         playFavoriteSong(state.currentFavoriteIndex);
+        return;
+    }
+
+    if (state.currentList === "custom") {
+        const playlist = getSelectedCustomPlaylist();
+        const items = playlist?.items || [];
+        if (items.length === 0) {
+            return;
+        }
+        const mode = state.playMode || "list";
+        let prevIndex = state.currentCustomTrackIndex;
+        if (mode === "random") {
+            prevIndex = Math.floor(Math.random() * items.length);
+        } else if (mode === "list") {
+            prevIndex = state.currentCustomTrackIndex - 1;
+            if (prevIndex < 0) {
+                prevIndex = items.length - 1;
+            }
+        }
+        if (mode !== "single") {
+            state.currentCustomTrackIndex = prevIndex;
+        }
+        playCustomPlaylistSong(state.currentCustomTrackIndex);
         return;
     }
 
@@ -5781,7 +6265,8 @@ function clearLyricsContent() {
 function clearLyricsIfLibraryEmpty() {
     const playlistEmpty = !Array.isArray(state.playlistSongs) || state.playlistSongs.length === 0;
     const favoritesEmpty = !Array.isArray(state.favoriteSongs) || state.favoriteSongs.length === 0;
-    if (!playlistEmpty || !favoritesEmpty) {
+    const customEmpty = ensureCustomPlaylistsArray().every((playlist) => !Array.isArray(playlist.items) || playlist.items.length === 0);
+    if (!playlistEmpty || !favoritesEmpty || !customEmpty) {
         return;
     }
 

@@ -242,6 +242,16 @@
                         >
                             收藏列表
                         </button>
+                        <button
+                            id="mobileCustomPlaylistsTab"
+                            class="playlist-tab"
+                            type="button"
+                            role="tab"
+                            aria-selected="false"
+                            data-target="custom"
+                        >
+                            歌单
+                        </button>
                     </div>
                     <div class="mobile-panel-actions">
                         <div class="mobile-actions-group" id="mobilePlaylistActions" role="group" aria-label="播放列表操作" aria-hidden="false">
@@ -318,6 +328,17 @@
                                 <i class="fas fa-trash" aria-hidden="true"></i>
                             </button>
                         </div>
+                        <div class="mobile-actions-group" id="mobileCustomPlaylistActions" role="group" aria-label="歌单操作" hidden aria-hidden="true">
+                            <button
+                                id="mobileCreateCustomPlaylistBtn"
+                                class="mobile-panel-action-btn"
+                                type="button"
+                                aria-label="新建歌单"
+                                title="新建歌单"
+                            >
+                                <i class="fas fa-plus" aria-hidden="true"></i>
+                            </button>
+                        </div>
                         <button id="mobilePanelClose" class="mobile-close-btn mobile-panel-action-btn" type="button" aria-label="收起播放面板">
                             <i class="fas fa-chevron-down" aria-hidden="true"></i>
                         </button>
@@ -343,6 +364,14 @@
                                 aria-selected="false"
                                 data-target="favorites"
                             >收藏列表</button>
+                            <button
+                                id="customPlaylistsTab"
+                                class="playlist-tab"
+                                type="button"
+                                role="tab"
+                                aria-selected="false"
+                                data-target="custom"
+                            >歌单</button>
                         </div>
                         <div class="playlist-actions-tray" role="group" aria-label="播放列表操作">
                             <input
@@ -405,6 +434,14 @@
                                 aria-selected="false"
                                 data-target="favorites"
                             >收藏列表</button>
+                            <button
+                                id="customPlaylistsTabSecondary"
+                                class="playlist-tab"
+                                type="button"
+                                role="tab"
+                                aria-selected="false"
+                                data-target="custom"
+                            >歌单</button>
                         </div>
                         <div class="playlist-actions-tray" role="group" aria-label="收藏列表操作">
                             <button
@@ -454,6 +491,53 @@
                     </div>
                     <div class="playlist-scroll">
                         <div class="playlist-items" id="favoriteItems"></div>
+                    </div>
+                </div>
+                <div class="playlist custom-playlists empty" id="customPlaylists" role="tabpanel" aria-labelledby="customPlaylistsTab" hidden>
+                    <div class="playlist-header">
+                        <div class="playlist-tabs" role="tablist">
+                            <button
+                                id="playlistTabTertiary"
+                                class="playlist-tab active"
+                                type="button"
+                                role="tab"
+                                aria-selected="true"
+                                data-target="playlist"
+                            >播放列表</button>
+                            <button
+                                id="favoritesTabTertiary"
+                                class="playlist-tab"
+                                type="button"
+                                role="tab"
+                                aria-selected="false"
+                                data-target="favorites"
+                            >收藏列表</button>
+                            <button
+                                id="customPlaylistsTabTertiary"
+                                class="playlist-tab"
+                                type="button"
+                                role="tab"
+                                aria-selected="false"
+                                data-target="custom"
+                            >歌单</button>
+                        </div>
+                        <div class="playlist-actions-tray" role="group" aria-label="歌单操作">
+                            <button
+                                class="playlist-action-btn"
+                                id="createCustomPlaylistBtn"
+                                type="button"
+                                title="新建歌单"
+                                aria-label="新建歌单"
+                            >
+                                <i class="fas fa-plus" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="custom-playlist-shell">
+                        <div class="custom-playlist-selector" id="customPlaylistSelector" aria-label="自定义歌单"></div>
+                        <div class="playlist-scroll">
+                            <div class="playlist-items" id="customPlaylistItems"></div>
+                        </div>
                     </div>
                 </div>
                 <div class="lyrics empty" id="lyrics" data-placeholder="default">

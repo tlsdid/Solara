@@ -640,6 +640,50 @@ body.background-transitioning .background-stage__layer--transition {
     box-shadow: 0 6px 16px rgba(46, 204, 113, 0.28);
 }
 
+.search-result-actions .action-btn.add-to-custom {
+    border-color: rgba(26, 188, 156, 0.55);
+    box-shadow: 0 6px 16px rgba(26, 188, 156, 0.24);
+}
+
+.custom-playlist-picker {
+    min-width: 180px;
+    max-width: min(260px, calc(100vw - 16px));
+    padding: 6px;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 16px 38px rgba(0, 0, 0, 0.18);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+}
+
+.dark-mode .custom-playlist-picker {
+    background: rgba(28, 28, 28, 0.96);
+    border-color: rgba(255, 255, 255, 0.12);
+}
+
+.custom-playlist-picker__item {
+    width: 100%;
+    padding: 9px 10px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-color);
+    text-align: left;
+    cursor: pointer;
+}
+
+.custom-playlist-picker__item:hover,
+.custom-playlist-picker__item:focus-visible {
+    background: var(--item-hover-bg);
+    outline: none;
+}
+
+.custom-playlist-picker__item--create {
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
 
 .import-selected-btn {
     display: inline-flex;
@@ -1151,6 +1195,122 @@ html[lang="en"] .playlist.empty .playlist-scroll::before {
 
 .favorites[hidden] {
     display: none !important;
+}
+
+.custom-playlists[hidden] {
+    display: none !important;
+}
+
+.custom-playlists.empty .playlist-scroll {
+    display: block;
+}
+
+.custom-playlists.empty .playlist-scroll::before {
+    content: none;
+}
+
+.custom-playlist-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    min-height: 0;
+    flex: 1 1 auto;
+}
+
+.custom-playlist-selector {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: thin;
+}
+
+.custom-playlist-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+    max-width: 180px;
+    padding: 7px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.45);
+    color: var(--text-secondary-color);
+    cursor: pointer;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.custom-playlist-chip span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.08);
+    font-size: 11px;
+}
+
+.custom-playlist-chip.active {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: #ffffff;
+}
+
+.custom-playlist-empty {
+    padding: 20px 12px;
+    color: var(--text-secondary-color);
+    text-align: center;
+    font-size: 14px;
+}
+
+.custom-playlists .playlist-items .playlist-item {
+    padding-right: 74px;
+}
+
+.custom-playlist-item-download,
+.custom-playlist-item-remove {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid transparent;
+    padding: 0;
+    font-size: 14px;
+    cursor: pointer;
+    opacity: 0;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease, opacity 0.2s ease;
+    z-index: 5;
+    color: #ffffff;
+}
+
+.custom-playlist-item-download {
+    right: 42px;
+    background: var(--success-color);
+    border-color: rgba(46, 204, 113, 0.5);
+    box-shadow: 0 4px 10px rgba(46, 204, 113, 0.2);
+}
+
+.custom-playlist-item-remove {
+    right: 10px;
+    background: rgba(255, 59, 48, 0.9);
+    border-color: rgba(231, 76, 60, 0.5);
+    box-shadow: 0 4px 10px rgba(231, 76, 60, 0.22);
+}
+
+.custom-playlists .playlist-item:hover .custom-playlist-item-download,
+.custom-playlists .playlist-item:hover .custom-playlist-item-remove,
+.custom-playlists .playlist-item:focus-within .custom-playlist-item-download,
+.custom-playlists .playlist-item:focus-within .custom-playlist-item-remove {
+    opacity: 1;
 }
 
 .playlist-items {
@@ -3269,4 +3429,3 @@ html.desktop-view body.dark-mode .search-result-artist {
     opacity: 1 !important;
     text-shadow: none !important;
 }
-

@@ -690,6 +690,27 @@ body.mobile-view .lyrics {
     min-height: 0;
 }
 
+body.mobile-view .custom-playlist-shell {
+    min-height: 0;
+}
+
+body.mobile-view .custom-playlist-selector {
+    width: 100%;
+    padding-bottom: 8px;
+}
+
+body.mobile-view .custom-playlist-chip {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.14);
+    color: rgba(255, 255, 255, 0.76);
+}
+
+body.mobile-view .custom-playlist-chip.active {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: #ffffff;
+}
+
 body.mobile-view .playlist.active,
 body.mobile-view .lyrics.active {
     display: flex;
@@ -747,6 +768,26 @@ body.mobile-view .playlist-items .playlist-item .playlist-item-download {
 }
 
 body.mobile-view .playlist-items .playlist-item .playlist-item-remove {
+    right: 12px;
+}
+
+body.mobile-view .custom-playlists .playlist-items .playlist-item {
+    padding-right: 88px;
+}
+
+body.mobile-view .custom-playlist-item-download,
+body.mobile-view .custom-playlist-item-remove {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    opacity: 1;
+}
+
+body.mobile-view .custom-playlist-item-download {
+    right: 48px;
+}
+
+body.mobile-view .custom-playlist-item-remove {
     right: 12px;
 }
 
