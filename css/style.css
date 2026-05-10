@@ -1,5 +1,5 @@
 :root {
-    --font-main: 'Noto Sans SC', 'Segoe UI', Arial, sans-serif;
+    --font-main: -apple-system, BlinkMacSystemFont, 'Inter', 'HarmonyOS Sans SC', 'MiSans', 'PingFang SC', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC', 'Segoe UI', Arial, sans-serif;
     --bg-gradient: linear-gradient(140deg, #e0f5e9 0%, #c6f0e0 35%, #a3e4d7 100%);
     --bg-gradient-next: var(--bg-gradient);
     --container-bg: rgba(255, 255, 255, 0.6);
@@ -3097,3 +3097,176 @@ html.desktop-view .notification {
 html.desktop-view .header .warning {
     display: none !important;
 }
+
+/* === Final soft graphite palette + modern system font ===
+   只改配色与字体：浅色辅色从纯黑改为柔和石墨灰；深色保持白辅色但降低刺眼感。
+   不改布局、不改缩放、不改搜索、不改播放逻辑。
+*/
+html.desktop-view {
+    --font-main: -apple-system, BlinkMacSystemFont, 'Inter', 'HarmonyOS Sans SC', 'MiSans', 'PingFang SC', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC', 'Segoe UI', Arial, sans-serif !important;
+
+    --primary-color: rgba(50, 58, 66, 0.88) !important;
+    --primary-color-dark: rgba(35, 42, 50, 0.92) !important;
+    --success-color: rgba(50, 58, 66, 0.88) !important;
+    --success-color-hover: rgba(35, 42, 50, 0.92) !important;
+
+    --text-color: rgba(22, 28, 34, 0.96) !important;
+    --text-primary-color: rgba(22, 28, 34, 0.96) !important;
+    --text-secondary-color: rgba(62, 74, 86, 0.86) !important;
+    --muted-text-color: rgba(82, 94, 106, 0.76) !important;
+
+    --item-hover-bg: rgba(50, 58, 66, 0.09) !important;
+    --item-current-bg: rgba(50, 58, 66, 0.15) !important;
+    --item-current-text: rgba(28, 34, 40, 0.96) !important;
+    --lyrics-highlight-bg: rgba(50, 58, 66, 0.13) !important;
+    --lyrics-highlight-text: rgba(28, 34, 40, 0.96) !important;
+
+    --zen-button-bg: rgba(50, 58, 66, 0.82) !important;
+    --zen-button-hover-bg: rgba(35, 42, 50, 0.90) !important;
+    --zen-button-text: rgba(255, 255, 255, 0.96) !important;
+    --range-track-bg: rgba(50, 58, 66, 0.20) !important;
+    --range-rest-bg: rgba(255, 255, 255, 0.44) !important;
+}
+
+html.desktop-view body,
+html.desktop-view button,
+html.desktop-view input,
+html.desktop-view select,
+html.desktop-view textarea {
+    font-family: var(--font-main) !important;
+}
+
+html.desktop-view body.dark-mode,
+html.desktop-view.dark-mode {
+    --font-main: -apple-system, BlinkMacSystemFont, 'Inter', 'HarmonyOS Sans SC', 'MiSans', 'PingFang SC', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC', 'Segoe UI', Arial, sans-serif !important;
+
+    --primary-color: rgba(226, 234, 240, 0.86) !important;
+    --primary-color-dark: rgba(246, 250, 252, 0.94) !important;
+    --success-color: rgba(226, 234, 240, 0.86) !important;
+    --success-color-hover: rgba(246, 250, 252, 0.94) !important;
+
+    --text-color: rgba(240, 246, 250, 0.96) !important;
+    --text-primary-color: rgba(240, 246, 250, 0.96) !important;
+    --text-secondary-color: rgba(212, 224, 232, 0.86) !important;
+    --muted-text-color: rgba(186, 200, 212, 0.78) !important;
+
+    --item-hover-bg: rgba(226, 234, 240, 0.09) !important;
+    --item-current-bg: rgba(226, 234, 240, 0.15) !important;
+    --item-current-text: rgba(246, 250, 252, 0.98) !important;
+    --lyrics-highlight-bg: rgba(226, 234, 240, 0.13) !important;
+    --lyrics-highlight-text: rgba(246, 250, 252, 0.98) !important;
+
+    --zen-button-bg: rgba(226, 234, 240, 0.84) !important;
+    --zen-button-hover-bg: rgba(246, 250, 252, 0.94) !important;
+    --zen-button-text: rgba(16, 22, 28, 0.96) !important;
+    --range-track-bg: rgba(226, 234, 240, 0.20) !important;
+    --range-rest-bg: rgba(255, 255, 255, 0.18) !important;
+}
+
+/* 浅色模式按钮从纯黑改成柔和石墨灰 */
+html.desktop-view .search-btn,
+html.desktop-view .controls button:not(.player-quality-btn),
+html.desktop-view .playlist-tab.active,
+html.desktop-view .import-selected-btn,
+html.desktop-view .load-more-btn:hover {
+    background: linear-gradient(145deg, rgba(66, 74, 82, 0.84), rgba(42, 50, 58, 0.84)) !important;
+    color: var(--zen-button-text) !important;
+    border-color: rgba(255, 255, 255, 0.26) !important;
+    box-shadow: 0 8px 18px rgba(18, 24, 30, 0.13) !important;
+    text-shadow: none !important;
+    filter: none !important;
+}
+
+html.desktop-view .search-btn:hover,
+html.desktop-view .controls button:not(.player-quality-btn):hover,
+html.desktop-view .playlist-tab.active:hover,
+html.desktop-view .import-selected-btn:not(:disabled):hover,
+html.desktop-view .load-more-btn:hover {
+    background: linear-gradient(145deg, rgba(54, 62, 70, 0.90), rgba(34, 42, 50, 0.90)) !important;
+}
+
+/* 深色模式白色辅色降低发光感，保持文字清晰 */
+html.desktop-view body.dark-mode .search-btn,
+html.desktop-view body.dark-mode .controls button:not(.player-quality-btn),
+html.desktop-view body.dark-mode .playlist-tab.active,
+html.desktop-view body.dark-mode .import-selected-btn,
+html.desktop-view body.dark-mode .load-more-btn:hover {
+    background: linear-gradient(145deg, rgba(242, 247, 250, 0.86), rgba(204, 216, 224, 0.82)) !important;
+    color: var(--zen-button-text) !important;
+    border-color: rgba(255, 255, 255, 0.30) !important;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.20) !important;
+    text-shadow: none !important;
+    filter: none !important;
+}
+
+html.desktop-view body.dark-mode .search-btn:hover,
+html.desktop-view body.dark-mode .controls button:not(.player-quality-btn):hover,
+html.desktop-view body.dark-mode .playlist-tab.active:hover,
+html.desktop-view body.dark-mode .import-selected-btn:not(:disabled):hover,
+html.desktop-view body.dark-mode .load-more-btn:hover {
+    background: linear-gradient(145deg, rgba(250, 253, 255, 0.94), rgba(218, 228, 236, 0.88)) !important;
+}
+
+/* 普通非激活按钮和控件保持银灰，避免黑白对比过硬 */
+html.desktop-view .controls .player-quality-btn,
+html.desktop-view .controls .player-quality-btn:hover,
+html.desktop-view .controls .player-quality-btn.active,
+html.desktop-view .theme-toggle-button,
+html.desktop-view .source-select-btn,
+html.desktop-view .playlist-tab:not(.active) {
+    background: rgba(238, 244, 248, 0.34) !important;
+    color: var(--text-color) !important;
+    border-color: var(--zen-glass-border) !important;
+    box-shadow: var(--zen-glass-soft-shadow) !important;
+}
+
+html.desktop-view body.dark-mode .controls .player-quality-btn,
+html.desktop-view body.dark-mode .controls .player-quality-btn:hover,
+html.desktop-view body.dark-mode .controls .player-quality-btn.active,
+html.desktop-view body.dark-mode .theme-toggle-button,
+html.desktop-view body.dark-mode .source-select-btn,
+html.desktop-view body.dark-mode .playlist-tab:not(.active) {
+    background: rgba(12, 22, 30, 0.58) !important;
+    color: var(--text-color) !important;
+    border-color: var(--zen-glass-border) !important;
+}
+
+/* 列表与歌词高亮跟随柔和黑白辅色 */
+html.desktop-view .search-result-item.selected,
+html.desktop-view .playlist-items .playlist-item.current,
+html.desktop-view .lyrics .current {
+    background: rgba(50, 58, 66, 0.14) !important;
+    color: rgba(24, 30, 36, 0.96) !important;
+    border-color: rgba(50, 58, 66, 0.18) !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+}
+
+html.desktop-view body.dark-mode .search-result-item.selected,
+html.desktop-view body.dark-mode .playlist-items .playlist-item.current,
+html.desktop-view body.dark-mode .lyrics .current {
+    background: rgba(226, 234, 240, 0.13) !important;
+    color: rgba(246, 250, 252, 0.98) !important;
+    border-color: rgba(226, 234, 240, 0.20) !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+}
+
+/* 深色模式可见性兜底 */
+html.desktop-view body.dark-mode .current-song-title,
+html.desktop-view body.dark-mode .current-song-artist,
+html.desktop-view body.dark-mode .playlist-items .playlist-item,
+html.desktop-view body.dark-mode .lyrics-content > div,
+html.desktop-view body.dark-mode .search-input,
+html.desktop-view body.dark-mode .source-select-btn,
+html.desktop-view body.dark-mode .playlist-tab,
+html.desktop-view body.dark-mode .player-quality-btn,
+html.desktop-view body.dark-mode .source-option,
+html.desktop-view body.dark-mode .quality-option,
+html.desktop-view body.dark-mode .search-result-title,
+html.desktop-view body.dark-mode .search-result-artist {
+    color: var(--text-color) !important;
+    opacity: 1 !important;
+    text-shadow: none !important;
+}
+
