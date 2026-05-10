@@ -2182,3 +2182,274 @@ input[type="range"]:active::-moz-range-thumb {
 .desktop-scale-shell {
     display: contents;
 }
+
+/* === Zen Browser Transparent Glass Skin ===
+   只处理透明视觉层：保留现有布局、缩放和封面取色逻辑。 */
+html.desktop-view {
+    --zen-glass-shell-bg: rgba(255, 255, 255, 0.18);
+    --zen-glass-panel-bg: rgba(255, 255, 255, 0.26);
+    --zen-glass-card-bg: rgba(255, 255, 255, 0.34);
+    --zen-glass-control-bg: rgba(255, 255, 255, 0.42);
+    --zen-glass-menu-bg: rgba(255, 255, 255, 0.72);
+    --zen-glass-border: rgba(255, 255, 255, 0.22);
+    --zen-glass-shadow: 0 18px 60px rgba(0, 0, 0, 0.18);
+    --zen-glass-soft-shadow: 0 10px 34px rgba(0, 0, 0, 0.12);
+    --zen-glass-blur: blur(18px) saturate(140%);
+    --zen-button-bg: var(--primary-color);
+    --zen-button-hover-bg: var(--primary-color-dark);
+}
+
+html.desktop-view body.dark-mode {
+    --zen-glass-shell-bg: rgba(20, 20, 20, 0.22);
+    --zen-glass-panel-bg: rgba(20, 20, 20, 0.38);
+    --zen-glass-card-bg: rgba(20, 20, 20, 0.44);
+    --zen-glass-control-bg: rgba(20, 20, 20, 0.50);
+    --zen-glass-menu-bg: rgba(20, 20, 20, 0.72);
+    --zen-glass-border: rgba(255, 255, 255, 0.16);
+    --zen-glass-shadow: 0 18px 60px rgba(0, 0, 0, 0.34);
+    --zen-glass-soft-shadow: 0 10px 34px rgba(0, 0, 0, 0.26);
+}
+
+@supports (background: color-mix(in srgb, red 20%, transparent)) {
+    html.desktop-view {
+        --zen-glass-shell-bg: color-mix(in srgb, var(--primary-color) 18%, transparent);
+        --zen-glass-panel-bg: color-mix(in srgb, var(--primary-color) 24%, rgba(255, 255, 255, 0.26));
+        --zen-glass-card-bg: color-mix(in srgb, var(--primary-color) 22%, rgba(255, 255, 255, 0.34));
+        --zen-glass-control-bg: color-mix(in srgb, var(--primary-color) 18%, rgba(255, 255, 255, 0.42));
+        --zen-glass-menu-bg: color-mix(in srgb, var(--primary-color) 18%, rgba(255, 255, 255, 0.72));
+        --zen-button-bg: color-mix(in srgb, var(--primary-color) 84%, transparent);
+        --zen-button-hover-bg: color-mix(in srgb, var(--primary-color-dark) 90%, transparent);
+    }
+
+    html.desktop-view body.dark-mode {
+        --zen-glass-shell-bg: color-mix(in srgb, var(--primary-color) 18%, transparent);
+        --zen-glass-panel-bg: color-mix(in srgb, var(--primary-color) 24%, rgba(20, 20, 20, 0.38));
+        --zen-glass-card-bg: color-mix(in srgb, var(--primary-color) 22%, rgba(20, 20, 20, 0.44));
+        --zen-glass-control-bg: color-mix(in srgb, var(--primary-color) 18%, rgba(20, 20, 20, 0.50));
+        --zen-glass-menu-bg: color-mix(in srgb, var(--primary-color) 18%, rgba(20, 20, 20, 0.72));
+    }
+}
+
+html.desktop-view,
+html.desktop-view body,
+html.desktop-view .desktop-scale-shell {
+    background: transparent !important;
+    background-color: transparent !important;
+}
+
+html.desktop-view .background-stage,
+html.desktop-view .background-stage__layer,
+html.desktop-view .background-stage__layer--base,
+html.desktop-view .background-stage__layer--transition {
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    filter: none !important;
+}
+
+html.desktop-view .container {
+    background: var(--zen-glass-shell-bg) !important;
+    border-color: var(--zen-glass-border) !important;
+    box-shadow: var(--zen-glass-shadow) !important;
+    backdrop-filter: var(--zen-glass-blur) !important;
+    -webkit-backdrop-filter: var(--zen-glass-blur) !important;
+}
+
+html.desktop-view .search-area,
+html.desktop-view .cover-area,
+html.desktop-view .playlist,
+html.desktop-view .lyrics {
+    background: var(--zen-glass-card-bg) !important;
+    border: 1px solid var(--zen-glass-border) !important;
+    box-shadow: var(--zen-glass-soft-shadow) !important;
+    backdrop-filter: var(--zen-glass-blur) !important;
+    -webkit-backdrop-filter: var(--zen-glass-blur) !important;
+}
+
+html.desktop-view .container.search-mode .search-area {
+    background: var(--zen-glass-card-bg) !important;
+    border-color: color-mix(in srgb, var(--primary-color) 55%, var(--zen-glass-border)) !important;
+    box-shadow: var(--zen-glass-shadow) !important;
+}
+
+html.desktop-view .search-input,
+html.desktop-view .source-select-btn,
+html.desktop-view .controls .player-quality-btn,
+html.desktop-view .playlist-tab:not(.active),
+html.desktop-view .load-more-btn,
+html.desktop-view .search-result-select {
+    background: var(--zen-glass-control-bg) !important;
+    border-color: var(--zen-glass-border) !important;
+    box-shadow: none !important;
+    backdrop-filter: var(--zen-glass-blur) !important;
+    -webkit-backdrop-filter: var(--zen-glass-blur) !important;
+}
+
+html.desktop-view .search-input::placeholder {
+    color: color-mix(in srgb, var(--text-secondary-color) 82%, transparent);
+}
+
+html.desktop-view .source-menu,
+html.desktop-view .player-quality-menu,
+html.desktop-view .dynamic-quality-menu,
+html.desktop-view .quality-menu,
+html.desktop-view .import-dropdown-menu {
+    background: var(--zen-glass-menu-bg) !important;
+    border: 1px solid var(--zen-glass-border) !important;
+    box-shadow: var(--zen-glass-shadow) !important;
+    backdrop-filter: var(--zen-glass-blur) !important;
+    -webkit-backdrop-filter: var(--zen-glass-blur) !important;
+}
+
+html.desktop-view .search-result-item,
+html.desktop-view .playlist-items .playlist-item {
+    background: color-mix(in srgb, var(--primary-color) 14%, transparent) !important;
+    border-color: var(--zen-glass-border) !important;
+    backdrop-filter: blur(14px) saturate(132%) !important;
+    -webkit-backdrop-filter: blur(14px) saturate(132%) !important;
+}
+
+html.desktop-view .search-result-item:hover:not(.selected),
+html.desktop-view .playlist-items .playlist-item:hover {
+    background: color-mix(in srgb, var(--primary-color) 24%, transparent) !important;
+}
+
+html.desktop-view .search-result-item.selected,
+html.desktop-view .playlist-items .playlist-item.current,
+html.desktop-view .lyrics .current {
+    background: color-mix(in srgb, var(--primary-color) 32%, transparent) !important;
+    border-color: color-mix(in srgb, var(--primary-color) 58%, var(--zen-glass-border)) !important;
+}
+
+html.desktop-view .search-btn,
+html.desktop-view .controls button,
+html.desktop-view .playlist-tab.active,
+html.desktop-view .import-selected-btn,
+html.desktop-view .load-more-btn:hover {
+    background: var(--zen-button-bg) !important;
+    border-color: transparent !important;
+    color: #ffffff !important;
+    box-shadow: 0 10px 26px color-mix(in srgb, var(--primary-color) 30%, transparent) !important;
+    backdrop-filter: blur(12px) saturate(136%) !important;
+    -webkit-backdrop-filter: blur(12px) saturate(136%) !important;
+}
+
+html.desktop-view .search-btn:hover,
+html.desktop-view .controls button:hover,
+html.desktop-view .import-selected-btn:not(:disabled):hover,
+html.desktop-view .load-more-btn:hover {
+    background: var(--zen-button-hover-bg) !important;
+}
+
+html.desktop-view .controls .player-quality-btn,
+html.desktop-view .controls .player-quality-btn:hover,
+html.desktop-view .controls .player-quality-btn.active {
+    color: var(--text-color) !important;
+}
+
+html.desktop-view .controls .player-quality-btn:hover,
+html.desktop-view .controls .player-quality-btn.active {
+    border-color: color-mix(in srgb, var(--primary-color) 55%, var(--zen-glass-border)) !important;
+    color: var(--primary-color) !important;
+}
+
+html.desktop-view .theme-toggle-button {
+    background: var(--zen-glass-control-bg) !important;
+    border-color: var(--zen-glass-border) !important;
+    box-shadow: var(--zen-glass-soft-shadow) !important;
+    backdrop-filter: var(--zen-glass-blur) !important;
+    -webkit-backdrop-filter: var(--zen-glass-blur) !important;
+}
+
+html.desktop-view .album-cover {
+    background: color-mix(in srgb, var(--primary-color) 82%, transparent) !important;
+    box-shadow: 0 12px 34px color-mix(in srgb, var(--primary-color) 20%, rgba(0, 0, 0, 0.18)) !important;
+}
+
+html.desktop-view .progress-container input[type="range"],
+html.desktop-view .volume-container input[type="range"] {
+    backdrop-filter: blur(10px) saturate(130%);
+    -webkit-backdrop-filter: blur(10px) saturate(130%);
+}
+
+html.desktop-view .notification {
+    background: color-mix(in srgb, var(--success-color) 82%, transparent) !important;
+    border: 1px solid var(--zen-glass-border) !important;
+    box-shadow: var(--zen-glass-soft-shadow) !important;
+    backdrop-filter: var(--zen-glass-blur) !important;
+    -webkit-backdrop-filter: var(--zen-glass-blur) !important;
+}
+
+html.desktop-view .notification.error {
+    background: color-mix(in srgb, var(--warning-color) 86%, transparent) !important;
+}
+
+html.desktop-view .notification.warning {
+    background: color-mix(in srgb, #f39c12 86%, transparent) !important;
+}
+
+@supports not (background: color-mix(in srgb, red 20%, transparent)) {
+    html.desktop-view .container.search-mode .search-area {
+        border-color: rgba(26, 188, 156, 0.42) !important;
+    }
+
+    html.desktop-view .search-result-item,
+    html.desktop-view .playlist-items .playlist-item {
+        background: rgba(255, 255, 255, 0.22) !important;
+    }
+
+    html.desktop-view body.dark-mode .search-result-item,
+    html.desktop-view body.dark-mode .playlist-items .playlist-item {
+        background: rgba(20, 20, 20, 0.32) !important;
+    }
+
+    html.desktop-view .search-result-item:hover:not(.selected),
+    html.desktop-view .playlist-items .playlist-item:hover {
+        background: rgba(26, 188, 156, 0.22) !important;
+    }
+
+    html.desktop-view .search-result-item.selected,
+    html.desktop-view .playlist-items .playlist-item.current,
+    html.desktop-view .lyrics .current {
+        background: rgba(26, 188, 156, 0.30) !important;
+        border-color: rgba(26, 188, 156, 0.52) !important;
+    }
+
+    html.desktop-view .search-btn,
+    html.desktop-view .controls button,
+    html.desktop-view .playlist-tab.active,
+    html.desktop-view .import-selected-btn,
+    html.desktop-view .load-more-btn:hover {
+        background: var(--primary-color) !important;
+        box-shadow: 0 10px 26px rgba(26, 188, 156, 0.26) !important;
+    }
+
+    html.desktop-view .search-btn:hover,
+    html.desktop-view .controls button:hover,
+    html.desktop-view .import-selected-btn:not(:disabled):hover,
+    html.desktop-view .load-more-btn:hover {
+        background: var(--primary-color-dark) !important;
+    }
+
+    html.desktop-view .controls .player-quality-btn:hover,
+    html.desktop-view .controls .player-quality-btn.active {
+        border-color: rgba(26, 188, 156, 0.52) !important;
+    }
+
+    html.desktop-view .album-cover {
+        background: var(--primary-color) !important;
+        box-shadow: 0 12px 34px rgba(0, 0, 0, 0.18) !important;
+    }
+
+    html.desktop-view .notification {
+        background: rgba(46, 204, 113, 0.82) !important;
+    }
+
+    html.desktop-view .notification.error {
+        background: rgba(231, 76, 60, 0.86) !important;
+    }
+
+    html.desktop-view .notification.warning {
+        background: rgba(243, 156, 18, 0.86) !important;
+    }
+}
