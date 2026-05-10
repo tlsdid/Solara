@@ -1,4 +1,45 @@
-const API_BASE_URL = "https://music-api.gdstudio.xyz/api.php";
+const API_BASE_URLS: Record<string, string[]> = {
+  netease: [
+    "https://music-api.gdstudio.xyz/api.php",
+    "https://music.gdstudio.xyz/api.php",
+  ],
+  kuwo: [
+    "https://music-api.gdstudio.xyz/api.php",
+    "https://music.gdstudio.xyz/api.php",
+  ],
+  tencent: [
+    "https://music-api.gdstudio.xyz/api.php",
+    "https://music.gdstudio.xyz/api.php",
+  ],
+  kugou: [
+    "https://music-api-cn.gdstudio.xyz/api.php",
+    "https://music-api.gdstudio.xyz/api.php",
+  ],
+  migu: [
+    "https://music-api-cn.gdstudio.xyz/api.php",
+    "https://music-api.gdstudio.xyz/api.php",
+  ],
+  ximalaya: [
+    "https://music-api-cn.gdstudio.xyz/api.php",
+    "https://music-api.gdstudio.xyz/api.php",
+  ],
+  joox: [
+    "https://music-api-hk.gdstudio.xyz/api.php",
+    "https://music-api.gdstudio.xyz/api.php",
+  ],
+  qobuz: [
+    "https://music-api-us.gdstudio.xyz/api.php",
+    "https://music-api.gdstudio.xyz/api.php",
+  ],
+  ytmusic: [
+    "https://music-api-us.gdstudio.xyz/api.php",
+    "https://music-api.gdstudio.xyz/api.php",
+  ],
+  default: [
+    "https://music-api.gdstudio.xyz/api.php",
+  ],
+};
+
 const KUWO_HOST_PATTERN = /(^|\.)kuwo\.cn$/i;
 const SAFE_RESPONSE_HEADERS = ["content-type", "cache-control", "accept-ranges", "content-length", "content-range", "etag", "last-modified", "expires"];
 
@@ -84,35 +125,74 @@ async function proxyKuwoAudio(targetUrl: string, request: Request): Promise<Resp
 }
 
 async function proxyApiRequest(url: URL, request: Request): Promise<Response> {
-  const apiUrl = new URL(API_BASE_URL);
-  url.searchParams.forEach((value, key) => {
-    if (key === "target" || key === "callback") {
-      return;
+  const source = url.searchParams.get("source") || "default";
+  const apiBases = API_BASE_URLS[source] || API_BASE_URLS.default;
+
+  let lastError = "";
+
+  for (const base of apiBases) {
+    try {
+      const apiUrl = new URL(base);
+
+      url.searchParams.forEach((value, key) => {
+        if (key === "target" || key === "callback") {
+          return;
+        }
+        apiUrl.searchParams.set(key, value);
+      });
+
+      if (!apiUrl.searchParams.has("types")) {
+        return new Response("Missing types", { status: 400 });
+      }
+
+      const upstream = await fetch(apiUrl.toString(), {
+        headers: {
+          "User-Agent": request.headers.get("User-Agent") ?? "Mozilla/5.0",
+          "Accept": "application/json,text/plain,*/*",
+        },
+      });
+
+      if (!upstream.ok) {
+        lastError = `${base} returned ${upstream.status}`;
+        continue;
+      }
+
+      const text = await upstream.text();
+
+      if (!text || text.trim().length === 0) {
+        lastError = `${base} returned empty response`;
+        continue;
+      }
+
+      const headers = createCorsHeaders(upstream.headers);
+      headers.set("Content-Type", "application/json; charset=utf-8");
+      headers.set("X-Solara-Upstream", base);
+
+      return new Response(text, {
+        status: 200,
+        headers,
+      });
+    } catch (error: any) {
+      lastError = `${base} failed: ${error?.message || String(error)}`;
+      continue;
     }
-    apiUrl.searchParams.set(key, value);
-  });
-
-  if (!apiUrl.searchParams.has("types")) {
-    return new Response("Missing types", { status: 400 });
   }
 
-  const upstream = await fetch(apiUrl.toString(), {
-    headers: {
-      "User-Agent": request.headers.get("User-Agent") ?? "Mozilla/5.0",
-      "Accept": "application/json",
-    },
-  });
-
-  const headers = createCorsHeaders(upstream.headers);
-  if (!headers.has("Content-Type")) {
-    headers.set("Content-Type", "application/json; charset=utf-8");
-  }
-
-  return new Response(upstream.body, {
-    status: upstream.status,
-    statusText: upstream.statusText,
-    headers,
-  });
+  return new Response(
+    JSON.stringify({
+      error: "All upstream music APIs failed",
+      detail: lastError,
+      source,
+    }),
+    {
+      status: 502,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Access-Control-Allow-Origin": "*",
+        "Cache-Control": "no-store",
+      },
+    }
+  );
 }
 
 export async function onRequest({ request }: { request: Request }): Promise<Response> {
