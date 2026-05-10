@@ -82,3 +82,278 @@ html.desktop-view .search-results-toolbar .import-selected-btn {
 html.desktop-view .search-results-list {
     padding-top: 60px;
 }
+
+/* Fixed desktop canvas + proportional fit.
+   Desktop browser windows keep one unchanged 16:9 layout and scale as a whole. */
+html.desktop-view {
+    --desktop-design-width: 1200px;
+    --desktop-design-height: 675px;
+    --desktop-scale: 1;
+    --desktop-shell-width: var(--desktop-design-width);
+    --desktop-shell-height: var(--desktop-design-height);
+    width: 100%;
+    height: 100%;
+    overflow: hidden !important;
+}
+
+html.desktop-view body {
+    width: 100vw !important;
+    height: 100vh !important;
+    min-height: 100vh !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-sizing: border-box !important;
+}
+
+html.desktop-view .desktop-scale-shell {
+    display: block;
+    width: var(--desktop-shell-width);
+    height: var(--desktop-shell-height);
+    flex: 0 0 auto;
+    position: relative;
+    overflow: visible;
+}
+
+html.desktop-view .container {
+    width: var(--desktop-design-width) !important;
+    height: var(--desktop-design-height) !important;
+    min-width: var(--desktop-design-width) !important;
+    max-width: none !important;
+    min-height: var(--desktop-design-height) !important;
+    max-height: none !important;
+    aspect-ratio: auto !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+    transform: scale(var(--desktop-scale));
+    transform-origin: top left;
+    overflow: visible;
+}
+
+html.desktop-view .container,
+html.desktop-view .container *,
+html.desktop-view .container *::before,
+html.desktop-view .container *::after {
+    box-sizing: border-box;
+}
+
+/* Desktop fixed canvas must not reflow into mobile/small-window structures. */
+html.desktop-view .search-container,
+html.desktop-view .transport-controls,
+html.desktop-view .control-trailing,
+html.desktop-view .audio-tools,
+html.desktop-view .playlist-header,
+html.desktop-view .playlist-tabs,
+html.desktop-view .playlist-actions-tray,
+html.desktop-view .current-song-title-row {
+    min-width: 0;
+}
+
+/* Prevent text/button overlap inside the fixed canvas before scaling. */
+html.desktop-view .search-input,
+html.desktop-view .source-select-btn,
+html.desktop-view .search-btn,
+html.desktop-view .playlist-tab,
+html.desktop-view .player-quality-btn,
+html.desktop-view #loadOnlineBtn,
+html.desktop-view .current-song-title,
+html.desktop-view .current-song-artist,
+html.desktop-view .playlist-items .playlist-item,
+html.desktop-view .import-selected-label,
+html.desktop-view #qualityLabel {
+    white-space: nowrap;
+}
+
+html.desktop-view .source-select-btn,
+html.desktop-view .search-btn,
+html.desktop-view .playlist-tab,
+html.desktop-view .player-quality-btn,
+html.desktop-view #loadOnlineBtn,
+html.desktop-view .controls button {
+    flex: 0 0 auto;
+}
+
+html.desktop-view .search-input,
+html.desktop-view .current-song-title,
+html.desktop-view .current-song-artist,
+html.desktop-view #qualityLabel,
+html.desktop-view .playlist-items .playlist-item {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* The cover title stays centered; the favorite button no longer squeezes the text. */
+html.desktop-view .current-song-info {
+    position: relative;
+    min-height: 44px;
+}
+
+html.desktop-view .current-song-title-row {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    padding: 0 34px;
+    gap: 0;
+}
+
+html.desktop-view .current-song-title-row .current-song-title {
+    max-width: 100%;
+    text-align: center;
+}
+
+html.desktop-view .current-song-title-row .current-favorite-btn {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 28px;
+    height: 28px;
+}
+
+/* Keep album art complete and stable in the desktop canvas. */
+html.desktop-view .cover-area {
+    overflow: hidden;
+}
+
+html.desktop-view .album-cover {
+    width: 200px;
+    height: 200px;
+    min-height: 200px;
+    aspect-ratio: 1 / 1;
+}
+
+html.desktop-view .album-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Stabilize bottom controls on the 1200px canvas; the whole bar scales afterward. */
+html.desktop-view .controls {
+    grid-template-columns: 300px minmax(260px, 1fr) 380px;
+    overflow: visible;
+}
+
+html.desktop-view .progress-container {
+    min-width: 0;
+}
+
+html.desktop-view .control-trailing {
+    flex-wrap: nowrap;
+    gap: 16px;
+    min-width: 0;
+}
+
+html.desktop-view .audio-tools {
+    flex-wrap: nowrap;
+    gap: 14px;
+    min-width: 0;
+}
+
+html.desktop-view .volume-container {
+    min-width: 126px;
+    flex: 0 0 126px;
+}
+
+html.desktop-view .volume-container input[type="range"] {
+    width: 92px;
+}
+
+html.desktop-view .control-trailing #loadOnlineBtn {
+    margin-left: 0;
+    flex: 0 0 auto;
+    max-width: 160px;
+    padding: 0 18px;
+}
+
+/* 修复电脑端封面卡片内容溢出：只影响桌面等比缩放画布 */
+html.desktop-view .cover-area {
+    justify-content: flex-start !important;
+    gap: 10px !important;
+    padding: 16px !important;
+    overflow: hidden !important;
+}
+
+/* 原来的 200px 在 1200×675 画布里太高，会挤压文字 */
+html.desktop-view .album-cover {
+    width: 180px !important;
+    height: 180px !important;
+    min-height: 180px !important;
+    aspect-ratio: 1 / 1 !important;
+    margin-bottom: 0 !important;
+    flex: 0 0 180px !important;
+}
+
+/* 保证封面图完整填充封面框 */
+html.desktop-view .album-cover img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+}
+
+/* 文字区固定高度，避免被封面挤出去 */
+html.desktop-view .current-song-info {
+    width: 100% !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+    flex: 0 0 48px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    overflow: hidden !important;
+}
+
+/* 歌名居中，收藏按钮不再挤压文字 */
+html.desktop-view .current-song-title-row {
+    position: relative !important;
+    width: 100% !important;
+    margin-bottom: 2px !important;
+    padding: 0 32px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    line-height: 1.2 !important;
+}
+
+/* 歌名不换行，不串行，超出省略 */
+html.desktop-view .current-song-title-row .current-song-title,
+html.desktop-view .current-song-title {
+    display: block !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    font-size: 15px !important;
+    line-height: 20px !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+/* 收藏按钮固定在右侧，不参与文字排版 */
+html.desktop-view .current-song-title-row .current-favorite-btn {
+    position: absolute !important;
+    right: 0 !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    width: 28px !important;
+    height: 28px !important;
+    flex: 0 0 28px !important;
+}
+
+/* 歌手名单独一行，不溢出 */
+html.desktop-view .current-song-artist {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    font-size: 13px !important;
+    line-height: 18px !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
