@@ -630,7 +630,7 @@ function buildAudioProxyUrl(url) {
         }
 
         if (parsedUrl.protocol === "http:" && /(^|\.)kuwo\.cn$/i.test(parsedUrl.hostname)) {
-            return `${API.baseUrl}?target=${encodeURIComponent(parsedUrl.toString())}`;
+            return `${API.proxyBaseUrl}?target=${encodeURIComponent(parsedUrl.toString())}`;
         }
 
         return parsedUrl.toString();
@@ -763,7 +763,8 @@ const savedCurrentPlaylist = (() => {
 
 // API配置 - 修复API地址和请求方式
 const API = {
-    baseUrl: "/proxy",
+    baseUrl: "https://music-api.gdstudio.xyz/api.php",
+    proxyBaseUrl: "/proxy",
 
     generateSignature: () => {
         return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
