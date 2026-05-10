@@ -3525,3 +3525,29 @@ html.desktop-view body.dark-mode .search-result-artist {
     opacity: 1 !important;
     text-shadow: none !important;
 }
+
+/* Mobile: simplify custom playlist action area */
+@media (max-width: 768px) {
+  body.mobile-view[data-mobile-panel-view="custom"] #mobileCreateCustomPlaylistBtn {
+    display: none !important;
+  }
+
+  body.mobile-view[data-mobile-panel-view="custom"] #mobileCustomPlaylistActions {
+    display: none !important;
+  }
+
+  body.mobile-view[data-mobile-panel-view="custom"] .mobile-panel-header {
+    align-items: flex-start;
+  }
+
+  body.mobile-view[data-mobile-panel-view="custom"] #mobilePanelClose {
+    position: absolute !important;
+    top: calc(100% + 18px);
+    right: 0;
+    z-index: 20;
+  }
+
+  body.mobile-view[data-mobile-panel-view="custom"] #customPlaylists .playlist-actions-tray {
+    padding-right: 64px;
+  }
+}
