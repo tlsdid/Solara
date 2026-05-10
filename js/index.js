@@ -327,6 +327,7 @@ function toggleMobileInlineLyrics() {
 const PLACEHOLDER_HTML = `<div class="placeholder"><i class="fas fa-music"></i></div>`;
 const paletteCache = new Map();
 const PALETTE_STORAGE_KEY = "paletteCache.v1";
+const USE_DYNAMIC_COVER_THEME = false;
 let paletteAbortController = null;
 const BACKGROUND_TRANSITION_DURATION = 850;
 let backgroundTransitionTimer = null;
@@ -1729,6 +1730,11 @@ function cancelDeferredPaletteUpdate() {
 
 function scheduleDeferredPaletteUpdate(imageUrl, options = {}) {
     const immediate = Boolean(options.immediate);
+    if (!USE_DYNAMIC_COVER_THEME) {
+        cancelDeferredPaletteUpdate();
+        queueDefaultPalette({ immediate });
+        return;
+    }
     if (!imageUrl) {
         cancelDeferredPaletteUpdate();
         if (immediate) {
@@ -1861,6 +1867,11 @@ async function fetchPaletteData(imageUrl, signal) {
 }
 
 async function updateDynamicBackground(imageUrl) {
+    if (!USE_DYNAMIC_COVER_THEME) {
+        resetDynamicBackground({ immediate: true });
+        return;
+    }
+
     paletteRequestId += 1;
     const requestId = paletteRequestId;
 
