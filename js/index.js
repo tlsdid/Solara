@@ -378,6 +378,8 @@ let paletteRequestId = 0;
 
 const REMOTE_STORAGE_ENDPOINT = "/api/storage";
 let remoteSyncEnabled = false;
+let localStorageMutatedBeforeRemoteReady = false;
+let pendingRemoteStorageItems = {};
 const STORAGE_KEYS_TO_SYNC = new Set([
     "playlistSongs",
     "currentTrackIndex",
@@ -529,8 +531,13 @@ function safeSetLocalStorage(key, value, options = {}) {
     } catch (error) {
         console.warn(`写入本地存储失败: ${key}`, error);
     }
-    if (!skipRemote && remoteSyncEnabled && shouldSyncStorageKey(key)) {
-        persistStorageItems({ [key]: value });
+    if (!skipRemote && shouldSyncStorageKey(key)) {
+        if (remoteSyncEnabled) {
+            persistStorageItems({ [key]: value });
+        } else {
+            localStorageMutatedBeforeRemoteReady = true;
+            pendingRemoteStorageItems[key] = value;
+        }
     }
 }
 
@@ -1025,6 +1032,9 @@ async function bootstrapPersistentStorage() {
     try {
         const remoteKeys = Array.from(STORAGE_KEYS_TO_SYNC);
         const snapshot = await persistentStorage.getItems(remoteKeys);
+        if (localStorageMutatedBeforeRemoteReady) {
+            return;
+        }
         if (!snapshot || !snapshot.d1Available || !snapshot.data) {
             return;
         }
@@ -1033,6 +1043,11 @@ async function bootstrapPersistentStorage() {
         console.warn("加载远程存储失败", error);
     } finally {
         remoteSyncEnabled = true;
+        const pendingItems = pendingRemoteStorageItems;
+        pendingRemoteStorageItems = {};
+        if (Object.keys(pendingItems).length > 0) {
+            persistStorageItems(pendingItems);
+        }
     }
 }
 
@@ -5134,15 +5149,19 @@ function deleteSelectedCustomPlaylist() {
         return;
     }
     const index = playlists.findIndex((item) => item.id === playlist.id);
-    if (index >= 0) {
-        playlists.splice(index, 1);
+    if (index < 0) {
+        showNotification("歌单不存在或已删除", "warning");
+        renderCustomPlaylists();
+        return;
     }
+    const remainingPlaylists = playlists.filter((item) => item.id !== playlist.id);
+    state.customPlaylists = remainingPlaylists;
     if (state.currentList === "custom" && state.currentPlaylist === `custom:${playlist.id}`) {
         state.currentList = "playlist";
         state.currentPlaylist = "playlist";
         state.currentCustomTrackIndex = 0;
     }
-    state.selectedCustomPlaylistId = playlists[index]?.id || playlists[index - 1]?.id || playlists[0]?.id || "";
+    state.selectedCustomPlaylistId = remainingPlaylists[index]?.id || remainingPlaylists[index - 1]?.id || remainingPlaylists[0]?.id || "";
     saveCustomPlaylistState();
     renderCustomPlaylists();
     switchLibraryTab(state.selectedCustomPlaylistId ? "custom" : "playlist");
