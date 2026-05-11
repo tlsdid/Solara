@@ -174,6 +174,9 @@
                             <button id="importToFavorites" class="import-dropdown-item" type="button" role="menuitem">
                                 导入到收藏列表
                             </button>
+                            <button id="importToCustomPlaylist" class="import-dropdown-item" type="button" role="menuitem">
+                                导入到歌单
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -314,6 +317,15 @@
                                 <i class="fas fa-file-export" aria-hidden="true"></i>
                             </button>
                             <button
+                                id="mobileSortFavoritesBtn"
+                                class="mobile-panel-action-btn"
+                                type="button"
+                                aria-label="按加入时间排序"
+                                title="按加入时间排序"
+                            >
+                                <i class="fas fa-arrow-down-wide-short" aria-hidden="true"></i>
+                            </button>
+                            <button
                                 id="mobileClearFavoritesBtn"
                                 class="mobile-panel-action-btn mobile-panel-clear-btn"
                                 type="button"
@@ -324,6 +336,15 @@
                             </button>
                         </div>
                         <div class="mobile-actions-group" id="mobileCustomPlaylistActions" role="group" aria-label="歌单操作" hidden aria-hidden="true">
+                            <button
+                                id="mobileImportCustomPlaylistBtn"
+                                class="mobile-panel-action-btn"
+                                type="button"
+                                aria-label="导入歌单歌曲"
+                                title="导入歌单歌曲"
+                            >
+                                <i class="fas fa-file-import" aria-hidden="true"></i>
+                            </button>
                             <button
                                 id="mobileCreateCustomPlaylistBtn"
                                 class="mobile-panel-action-btn"
@@ -341,6 +362,15 @@
                                 title="Rename playlist"
                             >
                                 <i class="fas fa-pen" aria-hidden="true"></i>
+                            </button>
+                            <button
+                                id="mobileSortCustomPlaylistBtn"
+                                class="mobile-panel-action-btn"
+                                type="button"
+                                aria-label="按加入时间排序"
+                                title="按加入时间排序"
+                            >
+                                <i class="fas fa-arrow-down-wide-short" aria-hidden="true"></i>
                             </button>
                             <button
                                 id="mobileDeleteCustomPlaylistBtn"
@@ -487,6 +517,15 @@
                                 <i class="fas fa-file-export" aria-hidden="true"></i>
                             </button>
                             <button
+                                class="playlist-action-btn"
+                                id="sortFavoritesBtn"
+                                type="button"
+                                title="按加入时间排序"
+                                aria-label="按加入时间排序"
+                            >
+                                <i class="fas fa-arrow-down-wide-short" aria-hidden="true"></i>
+                            </button>
+                            <button
                                 class="playlist-action-btn playlist-action-btn--clear"
                                 id="clearFavoritesBtn"
                                 type="button"
@@ -534,6 +573,22 @@
                             >歌单</button>
                         </div>
                         <div class="playlist-actions-tray" role="group" aria-label="歌单操作">
+                            <input
+                                id="importCustomPlaylistInput"
+                                class="playlist-import-input"
+                                type="file"
+                                accept="application/json"
+                                hidden
+                            />
+                            <button
+                                class="playlist-action-btn"
+                                id="importCustomPlaylistBtn"
+                                type="button"
+                                title="导入歌单歌曲"
+                                aria-label="导入歌单歌曲"
+                            >
+                                <i class="fas fa-file-import" aria-hidden="true"></i>
+                            </button>
                             <button
                                 class="playlist-action-btn"
                                 id="createCustomPlaylistBtn"
@@ -551,6 +606,15 @@
                                 aria-label="重命名歌单"
                             >
                                 <i class="fas fa-pen" aria-hidden="true"></i>
+                            </button>
+                            <button
+                                class="playlist-action-btn"
+                                id="sortCustomPlaylistBtn"
+                                type="button"
+                                title="按加入时间排序"
+                                aria-label="按加入时间排序"
+                            >
+                                <i class="fas fa-arrow-down-wide-short" aria-hidden="true"></i>
                             </button>
                             <button
                                 class="playlist-action-btn playlist-action-btn--clear"
