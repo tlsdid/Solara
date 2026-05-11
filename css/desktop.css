@@ -363,10 +363,99 @@ html.desktop-view .current-song-artist {
     text-overflow: ellipsis !important;
 }
 
-html.desktop-view.dark-mode .current-song-artist,
-html.desktop-view body.dark-mode .current-song-artist {
-    color: rgba(226, 235, 242, 0.88) !important;
-    opacity: 1 !important;
+/* Desktop only: fix library header buttons after adding sort/import controls */
+html.desktop-view .playlist-header {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  grid-template-rows: auto auto !important;
+  align-items: center !important;
+  column-gap: 8px !important;
+  row-gap: 8px !important;
+}
+
+html.desktop-view .playlist-tabs {
+  grid-column: 1 / 2 !important;
+  grid-row: 1 !important;
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+}
+
+html.desktop-view .playlist-tab {
+  flex: 0 0 auto !important;
+  min-width: 0 !important;
+  padding: 8px 10px !important;
+  font-size: 14px !important;
+  white-space: nowrap !important;
+}
+
+html.desktop-view .playlist-actions-tray {
+  grid-column: 2 / 3 !important;
+  grid-row: 1 !important;
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  justify-content: flex-end !important;
+  align-items: center !important;
+  gap: 6px !important;
+  width: auto !important;
+  min-width: max-content !important;
+  margin-left: 0 !important;
+  overflow: visible !important;
+}
+
+html.desktop-view .playlist-action-btn {
+  display: inline-flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  flex: 0 0 24px !important;
+  width: 24px !important;
+  min-width: 24px !important;
+  height: 24px !important;
+  padding: 0 !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 13px !important;
+  line-height: 1 !important;
+}
+
+html.desktop-view .playlist-action-btn i,
+html.desktop-view .playlist-action-btn svg {
+  pointer-events: none !important;
+}
+
+/* Search row: compatible with different existing class names */
+html.desktop-view .playlist-search,
+html.desktop-view .library-search,
+html.desktop-view .playlist-search-wrapper,
+html.desktop-view .playlist-filter {
+  grid-column: 1 / -1 !important;
+  grid-row: 2 !important;
+  width: 100% !important;
+}
+
+/* Custom playlist tab: keep old buttons, show sort + import without overlap */
+html.desktop-view #customPlaylists #createCustomPlaylistBtn {
+  order: 1 !important;
+}
+
+html.desktop-view #customPlaylists #renameCustomPlaylistBtn {
+  order: 2 !important;
+}
+
+html.desktop-view #customPlaylists #deleteCustomPlaylistBtn {
+  order: 3 !important;
+}
+
+html.desktop-view #customPlaylists #sortCustomPlaylistBtn {
+  order: 4 !important;
+}
+
+html.desktop-view #customPlaylists #importCustomPlaylistBtn {
+  order: 5 !important;
+  display: inline-flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
 
