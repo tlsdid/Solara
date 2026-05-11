@@ -66,25 +66,41 @@ export async function onRequest(context: any): Promise<Response> {
       }
 
       const searchSource = sourceMode === "qq" ? "kuwo" : sourceMode;
-      const keyword = buildSearchKeyword(track);
-      const results = await searchMusic(keyword, searchSource, count);
-      const match = pickBestMatch(track, results);
+const keyword = buildSearchKeyword(track);
 
-      if (!match) {
-        missing.push({
-          index: index + 1,
-          reason: `not found on ${searchSource}`,
-          keyword,
-          name: track.name,
-          artist: track.artist,
-          album: track.album,
-          raw: rawTrack,
-        });
-        continue;
-      }
+let results: any[] = [];
 
-      converted.push(toSolaraSong({ ...match, source: searchSource }));
-    }
+try {
+  results = await searchMusic(keyword, searchSource, count);
+} catch (error: any) {
+  missing.push({
+    index: index + 1,
+    reason: `search failed on ${searchSource}: ${error?.message || String(error)}`,
+    keyword,
+    name: track.name,
+    artist: track.artist,
+    album: track.album,
+    raw: rawTrack,
+  });
+  continue;
+}
+
+const match = pickBestMatch(track, results);
+
+if (!match) {
+  missing.push({
+    index: index + 1,
+    reason: `not found on ${searchSource}`,
+    keyword,
+    name: track.name,
+    artist: track.artist,
+    album: track.album,
+    raw: rawTrack,
+  });
+  continue;
+}
+
+converted.push(toSolaraSong({ ...match, source: searchSource }));
 
     const payload = {
       meta: {
