@@ -553,6 +553,63 @@ function safeRemoveLocalStorage(key, options = {}) {
     }
 }
 
+const REMOTE_BOOTSTRAP_FLAG = "solara.remoteBootstrap.done";
+
+async function bootstrapRemoteStorage() {
+  try {
+    const available = await persistentStorage.checkAvailability();
+
+    if (!available) {
+      return;
+    }
+
+    remoteSyncEnabled = true;
+
+    const keys = Array.from(STORAGE_KEYS_TO_SYNC);
+    const result = await persistentStorage.getItems(keys);
+    const remoteData = result && result.data && typeof result.data === "object"
+      ? result.data
+      : {};
+
+    let changed = false;
+
+    for (const key of keys) {
+      const value = remoteData[key];
+
+      if (value === null || value === undefined || value === "") {
+        continue;
+      }
+
+      try {
+        const localValue = localStorage.getItem(key);
+
+        if (localValue !== value) {
+          localStorage.setItem(key, value);
+          changed = true;
+        }
+      } catch (error) {
+        console.warn(`恢复远程存储失败: ${key}`, error);
+      }
+    }
+
+    if (Object.keys(pendingRemoteStorageItems).length > 0) {
+      await persistentStorage.setItems(pendingRemoteStorageItems);
+      pendingRemoteStorageItems = {};
+      localStorageMutatedBeforeRemoteReady = false;
+    }
+
+    const alreadyBootstrapped = sessionStorage.getItem(REMOTE_BOOTSTRAP_FLAG);
+
+    if (changed && !alreadyBootstrapped) {
+      sessionStorage.setItem(REMOTE_BOOTSTRAP_FLAG, "1");
+      window.location.reload();
+    }
+  } catch (error) {
+    console.warn("初始化远程存储失败", error);
+  }
+}
+
+bootstrapRemoteStorage();
 function parseJSON(value, fallback) {
     if (!value) return fallback;
     try {
