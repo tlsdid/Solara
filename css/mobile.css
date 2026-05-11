@@ -1108,26 +1108,22 @@ body.mobile-view .container::after {
   border-radius: 0 !important;
 }
 
-/* Mobile: force top title to exact screen center */
-body.mobile-view .mobile-now-playing-header,
-body.mobile-view .mobile-player-header,
-body.mobile-view .mobile-header,
-body.mobile-view .player-header {
+/* Mobile: center Solara title when top bar has asymmetric buttons */
+body.mobile-view .top-bar,
+body.mobile-view .mobile-top-bar,
+body.mobile-view .mobile-now-playing-top,
+body.mobile-view .now-playing-header {
   position: relative !important;
 }
 
-body.mobile-view .mobile-now-playing-header .mobile-brand,
-body.mobile-view .mobile-now-playing-header .app-title,
-body.mobile-view .mobile-now-playing-header h1,
-body.mobile-view .mobile-player-header .mobile-brand,
-body.mobile-view .mobile-player-header .app-title,
-body.mobile-view .mobile-player-header h1,
-body.mobile-view .mobile-header .mobile-brand,
-body.mobile-view .mobile-header .app-title,
-body.mobile-view .mobile-header h1,
-body.mobile-view .player-header .mobile-brand,
-body.mobile-view .player-header .app-title,
-body.mobile-view .player-header h1 {
+body.mobile-view .top-bar h1,
+body.mobile-view .mobile-top-bar h1,
+body.mobile-view .mobile-now-playing-top h1,
+body.mobile-view .now-playing-header h1,
+body.mobile-view .top-bar .title,
+body.mobile-view .mobile-top-bar .title,
+body.mobile-view .mobile-now-playing-top .title,
+body.mobile-view .now-playing-header .title {
   position: absolute !important;
   left: 50% !important;
   transform: translateX(-50%) !important;
