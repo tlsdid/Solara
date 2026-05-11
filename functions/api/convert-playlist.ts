@@ -20,7 +20,7 @@ export const onRequestPost: PagesFunction = async ({ request }) => {
     const tracks = extractTracks(rawItems).slice(0, limit);
 
     if (tracks.length === 0) {
-      return jsonResponse({ ok: false, error: "没有识别到歌曲" }, 400);
+      return jsonResponse({ ok: false, error: "没有识别到歌曲。请确认粘贴的是完整歌单链接。" }, 400);
     }
 
     const converted: any[] = [];
@@ -51,18 +51,13 @@ export const onRequestPost: PagesFunction = async ({ request }) => {
         continue;
       }
 
-      const searchSource = sourceMode === "qq" ? "kuwo" : sourceMode;
-      const keyword = buildSearchKeyword(track);
+      const matchResult = await findBestPlayableMatch(track, sourceMode, count);
 
-      let results: any[] = [];
-
-      try {
-        results = await searchMusic(keyword, searchSource, count);
-      } catch (error: any) {
+      if (!matchResult.song) {
         missing.push({
           index: index + 1,
-          reason: `search failed on ${searchSource}: ${error?.message || String(error)}`,
-          keyword,
+          reason: matchResult.reason || "not found",
+          tried: matchResult.tried,
           name: track.name,
           artist: track.artist,
           album: track.album,
@@ -71,36 +66,7 @@ export const onRequestPost: PagesFunction = async ({ request }) => {
         continue;
       }
 
-      const match = pickBestMatch(track, results);
-
-      if (!match) {
-        missing.push({
-          index: index + 1,
-          reason: `not found on ${searchSource}`,
-          keyword,
-          name: track.name,
-          artist: track.artist,
-          album: track.album,
-          raw: rawTrack,
-        });
-        continue;
-      }
-
-      converted.push(toSolaraSong({ ...match, source: searchSource }));
-    }
-
-    if (converted.length === 0) {
-      return jsonResponse({
-        ok: false,
-        error: "没有成功转换任何歌曲。请下载未匹配报告或改用其他来源。",
-        missing: { missing },
-        summary: {
-          total: tracks.length,
-          converted: converted.length,
-          missing: missing.length,
-          sourceMode,
-        },
-      }, 422);
+      converted.push(toSolaraSong({ ...matchResult.song, source: matchResult.source }));
     }
 
     const payload = {
@@ -132,6 +98,9 @@ export const onRequestPost: PagesFunction = async ({ request }) => {
         missing: missing.length,
         sourceMode,
       },
+      warning: converted.length === 0
+        ? "没有成功转换任何歌曲。Solara JSON 为空，请下载未匹配报告查看原因。"
+        : "",
     });
   } catch (error: any) {
     return jsonResponse({
@@ -231,7 +200,7 @@ async function fetchQqPlaylistFromUrl(url: string) {
   const playlist = data?.cdlist?.[0];
 
   if (!playlist || !Array.isArray(playlist.songlist)) {
-    throw new Error("QQ 音乐歌单返回异常");
+    throw new Error(`QQ 音乐歌单返回异常：${JSON.stringify(data).slice(0, 180)}`);
   }
 
   return playlist.songlist;
@@ -239,16 +208,20 @@ async function fetchQqPlaylistFromUrl(url: string) {
 
 function extractQqPlaylistId(url: string) {
   const text = String(url || "").trim();
-  const query = text.match(/[?&]id=(\d+)/);
+
+  const query = text.match(/[?&](?:id|disstid)=([0-9]+)/);
   if (query) return query[1];
 
-  const pathMatch = text.match(/\/playlist\/(\d+)/);
+  const ryqq = text.match(/\/ryqq\/playlist\/([0-9]+)/);
+  if (ryqq) return ryqq[1];
+
+  const pathMatch = text.match(/\/playlist\/([0-9]+)/);
   if (pathMatch) return pathMatch[1];
 
-  const numericPath = text.match(/\/(\d+)(?:[/?#]|$)/);
-  if (numericPath) return numericPath[1];
+  const encoded = text.match(/playlist%2F([0-9]+)/i);
+  if (encoded) return encoded[1];
 
-  const direct = text.match(/^\d+$/);
+  const direct = text.match(/^[0-9]+$/);
   return direct ? direct[0] : "";
 }
 
@@ -290,13 +263,14 @@ async function fetchNetEasePlaylistFromUrl(url: string) {
 
 function extractNetEasePlaylistId(url: string) {
   const text = String(url || "").trim();
-  const direct = text.match(/(?:playlist\?id=|[?&]id=)(\d+)/);
+
+  const direct = text.match(/(?:playlist\?id=|[?&]id=)([0-9]+)/);
   if (direct) return direct[1];
 
-  const numericPath = text.match(/\/playlist\/(\d+)/);
+  const numericPath = text.match(/\/playlist\/([0-9]+)/);
   if (numericPath) return numericPath[1];
 
-  const numeric = text.match(/^\d+$/);
+  const numeric = text.match(/^[0-9]+$/);
   return numeric ? numeric[0] : "";
 }
 
@@ -312,7 +286,7 @@ async function fetchNetEasePlaylist(id: string) {
   const data = parseNetEaseJson(await response.text());
 
   if (!data || data.code !== 200 || !data.playlist) {
-    throw new Error("网易云歌单返回异常");
+    throw new Error(`网易云歌单返回异常：${JSON.stringify(data).slice(0, 180)}`);
   }
 
   return data.playlist;
@@ -442,11 +416,83 @@ function artistsFromValue(value: any): string[] {
 }
 
 function isLikelyNumericId(value: any) {
-  return /^\d+$/.test(String(value));
+  return /^[0-9]+$/.test(String(value));
 }
 
-function buildSearchKeyword(track: any) {
-  return [track.name, track.artist?.[0] || ""].filter(Boolean).join(" ");
+async function findBestPlayableMatch(track: any, sourceMode: Exclude<SourceMode, "auto">, count: number) {
+  const sources = getSearchSources(sourceMode);
+  const keywords = buildSearchKeywords(track);
+  const tried: any[] = [];
+  let best: { song: any; source: string; score: number } | null = null;
+
+  for (const source of sources) {
+    for (const keyword of keywords) {
+      if (!keyword) continue;
+
+      try {
+        const results = await searchMusic(keyword, source, count);
+        const candidate = pickBestMatch(track, results, keyword);
+
+        tried.push({
+          source,
+          keyword,
+          resultCount: Array.isArray(results) ? results.length : 0,
+          bestScore: candidate?.score || 0,
+        });
+
+        if (candidate && (!best || candidate.score > best.score)) {
+          best = {
+            song: candidate.song,
+            source,
+            score: candidate.score,
+          };
+        }
+
+        if (best && best.score >= 75) {
+          return { song: best.song, source: best.source, tried };
+        }
+      } catch (error: any) {
+        tried.push({
+          source,
+          keyword,
+          error: error?.message || String(error),
+        });
+      }
+    }
+  }
+
+  if (best && best.score >= 45) {
+    return { song: best.song, source: best.source, tried };
+  }
+
+  return {
+    song: null,
+    source: "",
+    tried,
+    reason: tried.some((item) => item.error)
+      ? "all search attempts failed or no reliable match"
+      : "no reliable match",
+  };
+}
+
+function getSearchSources(sourceMode: Exclude<SourceMode, "auto">) {
+  if (sourceMode === "qq") return ["kuwo", "netease"];
+  if (sourceMode === "kuwo") return ["kuwo", "netease"];
+  return ["netease", "kuwo"];
+}
+
+function buildSearchKeywords(track: any) {
+  const name = firstString(track.name);
+  const artist = firstString(track.artist?.[0]);
+  const cleanName = removeBracketText(name);
+  const keywords = [
+    [name, artist].filter(Boolean).join(" "),
+    [cleanName, artist].filter(Boolean).join(" "),
+    name,
+    cleanName,
+  ];
+
+  return Array.from(new Set(keywords.map((item) => item.trim()).filter(Boolean)));
 }
 
 async function searchMusic(keyword: string, source: string, count: number) {
@@ -473,13 +519,13 @@ async function searchMusic(keyword: string, source: string, count: number) {
       }
 
       const data = await response.json();
-      await delay(80);
+      await delay(120);
 
       return Array.isArray(data) ? data : [];
     } catch (error) {
       lastError = error;
       if (attempt < 3) {
-        await delay(300 * attempt);
+        await delay(450 * attempt);
       }
     }
   }
@@ -491,46 +537,65 @@ function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function pickBestMatch(track: any, results: any[]) {
+function pickBestMatch(track: any, results: any[], keyword = "") {
   const scored = results
-    .map((song) => ({ song, score: scoreMatch(track, song) }))
-    .filter((entry) => entry.score >= 60)
+    .map((song) => ({ song, score: scoreMatch(track, song, keyword) }))
+    .filter((entry) => entry.score >= 35)
     .sort((a, b) => b.score - a.score);
 
-  return scored[0]?.song || null;
+  return scored[0] || null;
 }
 
-function scoreMatch(track: any, song: any) {
+function scoreMatch(track: any, song: any, keyword = "") {
   const wantedName = normalizeText(track.name);
+  const wantedNameClean = normalizeText(removeBracketText(track.name));
   const foundName = normalizeText(song.name);
 
-  if (!wantedName || !foundName) return 0;
+  if (!wantedName && !wantedNameClean) return 0;
+  if (!foundName) return 0;
 
   let score = 0;
 
-  if (wantedName === foundName) {
+  if (wantedName && wantedName === foundName) {
+    score += 75;
+  } else if (wantedNameClean && wantedNameClean === foundName) {
     score += 70;
-  } else if (wantedName.includes(foundName) || foundName.includes(wantedName)) {
-    score += 45;
+  } else if (wantedName && (wantedName.includes(foundName) || foundName.includes(wantedName))) {
+    score += 50;
+  } else if (wantedNameClean && (wantedNameClean.includes(foundName) || foundName.includes(wantedNameClean))) {
+    score += 48;
+  } else if (keyword && normalizeText(keyword).includes(foundName)) {
+    score += 38;
   }
 
   const wantedArtists = track.artist.map(normalizeText).filter(Boolean);
   const foundArtists = normalizeArtists(song.artist, song.artists, song.singer).map(normalizeText).filter(Boolean);
 
   if (wantedArtists.length === 0 || foundArtists.length === 0) {
-    score += 10;
+    score += 8;
   } else if (wantedArtists.some((wanted: string) => foundArtists.some((found: string) => wanted === found || wanted.includes(found) || found.includes(wanted)))) {
     score += 30;
+  } else if (wantedArtists.some((wanted: string) => foundArtists.some((found: string) => overlapText(wanted, found)))) {
+    score += 12;
   }
 
   const wantedAlbum = normalizeText(track.album);
   const foundAlbum = normalizeText(normalizeAlbum(song.album));
 
   if (wantedAlbum && foundAlbum && (wantedAlbum === foundAlbum || wantedAlbum.includes(foundAlbum) || foundAlbum.includes(wantedAlbum))) {
-    score += 10;
+    score += 8;
   }
 
   return score;
+}
+
+function overlapText(a: string, b: string) {
+  if (!a || !b) return false;
+  return a.length >= 2 && b.length >= 2 && (a.includes(b.slice(0, 2)) || b.includes(a.slice(0, 2)));
+}
+
+function removeBracketText(value: any) {
+  return String(value || "").replace(/\([^)]*\)|（[^）]*）|\[[^\]]*\]|【[^】]*】/g, "").trim();
 }
 
 function normalizeText(value: any) {
