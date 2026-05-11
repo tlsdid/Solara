@@ -57,7 +57,6 @@ const dom = {
     durationDisplay: document.getElementById("durationDisplay"),
     volumeSlider: document.getElementById("volumeSlider"),
     volumeIcon: document.getElementById("volumeIcon"),
-    miniPlayerBtn: document.getElementById("miniPlayerBtn"),
     qualityToggle: document.getElementById("qualityToggle"),
     playerQualityMenu: document.getElementById("playerQualityMenu"),
     qualityLabel: document.getElementById("qualityLabel"),
@@ -496,10 +495,6 @@ function createPersistentStorageClient() {
 }
 
 const persistentStorage = createPersistentStorageClient();
-const MINI_PLAYER_CHANNEL_NAME = "solara-mini-player";
-const MINI_PLAYER_STATE_KEY = "solara.miniPlayerState";
-let miniPlayerChannel = null;
-let miniPlayerPublishTimer = null;
 
 function shouldSyncStorageKey(key) {
     return STORAGE_KEYS_TO_SYNC.has(key);
@@ -1962,7 +1957,6 @@ function showAlbumCoverPlaceholder() {
     if (typeof window.__SOLARA_UPDATE_MEDIA_METADATA === 'function') {
         window.__SOLARA_UPDATE_MEDIA_METADATA();
     }
-    publishMiniPlayerState({ immediate: true });
 }
 
 function setAlbumCoverImage(url) {
@@ -1973,7 +1967,6 @@ function setAlbumCoverImage(url) {
     if (typeof window.__SOLARA_UPDATE_MEDIA_METADATA === 'function') {
         window.__SOLARA_UPDATE_MEDIA_METADATA();
     }
-    publishMiniPlayerState({ immediate: true });
 }
 
 loadStoredPalettes();
@@ -2411,101 +2404,6 @@ function formatTime(seconds) {
     return `${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
 }
 
-function getMiniPlayerSnapshot() {
-    const audio = dom.audioPlayer;
-    const duration = audio && Number.isFinite(audio.duration) && audio.duration > 0
-        ? audio.duration
-        : Number(dom.progressBar?.max) || 0;
-    const currentTime = audio && Number.isFinite(audio.currentTime)
-        ? audio.currentTime
-        : Number(dom.progressBar?.value) || 0;
-    const song = state.currentSong || {};
-    const artist = Array.isArray(song.artist)
-        ? song.artist.join(", ")
-        : (song.artist || dom.currentSongArtist?.textContent || "未知艺术家");
-
-    return {
-        title: song.name || dom.currentSongTitle?.textContent || "选择一首歌曲",
-        artist,
-        artworkUrl: state.currentArtworkUrl || toAbsoluteUrl("/favicon.png"),
-        currentTime,
-        duration,
-        isPlaying: Boolean(audio && !audio.paused && !audio.ended),
-    };
-}
-
-function publishMiniPlayerState(options = {}) {
-    if (isMobileView) {
-        return;
-    }
-    const { immediate = false } = options;
-    const publish = () => {
-        miniPlayerPublishTimer = null;
-        const snapshot = getMiniPlayerSnapshot();
-        try {
-            localStorage.setItem(MINI_PLAYER_STATE_KEY, JSON.stringify(snapshot));
-        } catch (error) {
-            console.warn("保存迷你播放器状态失败", error);
-        }
-        if (miniPlayerChannel) {
-            miniPlayerChannel.postMessage({ type: "state", state: snapshot });
-        }
-    };
-
-    if (immediate) {
-        if (miniPlayerPublishTimer) {
-            clearTimeout(miniPlayerPublishTimer);
-            miniPlayerPublishTimer = null;
-        }
-        publish();
-        return;
-    }
-
-    if (!miniPlayerPublishTimer) {
-        miniPlayerPublishTimer = window.setTimeout(publish, 250);
-    }
-}
-
-function handleMiniPlayerCommand(message) {
-    if (!message || message.type !== "command") {
-        return;
-    }
-    if (message.action === "toggle") {
-        togglePlayPause();
-    } else if (message.action === "previous") {
-        playPrevious();
-    } else if (message.action === "next") {
-        playNext();
-    } else if (message.action === "seek") {
-        seekAudio(Number(message.value));
-    } else if (message.action === "requestState") {
-        publishMiniPlayerState({ immediate: true });
-    }
-}
-
-function setupMiniPlayerBridge() {
-    if (isMobileView) {
-        return;
-    }
-    if (typeof BroadcastChannel === "function") {
-        miniPlayerChannel = new BroadcastChannel(MINI_PLAYER_CHANNEL_NAME);
-        miniPlayerChannel.addEventListener("message", (event) => {
-            handleMiniPlayerCommand(event.data);
-        });
-    }
-    if (dom.miniPlayerBtn) {
-        dom.miniPlayerBtn.addEventListener("click", () => {
-            window.open(
-                "/mini-player.html",
-                "solaraMiniPlayer",
-                "popup=yes,width=360,height=520,resizable=yes,scrollbars=no"
-            );
-            publishMiniPlayerState({ immediate: true });
-        });
-    }
-    publishMiniPlayerState({ immediate: true });
-}
-
 function updatePlayPauseButton() {
     if (!dom.playPauseBtn) return;
     const isPlaying = !dom.audioPlayer.paused && !dom.audioPlayer.ended;
@@ -2514,7 +2412,6 @@ function updatePlayPauseButton() {
     if (document.body) {
         document.body.classList.toggle("is-playing", isPlaying);
     }
-    publishMiniPlayerState();
 }
 
 function updateProgressBarBackground(value = Number(dom.progressBar.value), max = Number(dom.progressBar.max)) {
@@ -2569,7 +2466,6 @@ function handleTimeUpdate() {
     }
 
     syncLyrics();
-    publishMiniPlayerState();
 
     if (state.currentList === "favorite") {
         state.favoritePlaybackTime = currentTime;
@@ -2601,7 +2497,6 @@ function handleLoadedMetadata() {
         setAudioCurrentTime(state.pendingSeekTime);
         state.pendingSeekTime = null;
     }
-    publishMiniPlayerState({ immediate: true });
 }
 
 function setAudioCurrentTime(time) {
@@ -2621,7 +2516,6 @@ function setAudioCurrentTime(time) {
     } else {
         state.currentPlaybackTime = clamped;
     }
-    publishMiniPlayerState({ immediate: true });
 }
 
 function handleProgressInput() {
@@ -3466,7 +3360,6 @@ function setupInteractions() {
     updateSourceLabel();
     buildQualityMenu();
     ensureQualityMenuPortal();
-    setupMiniPlayerBridge();
     initializePlaylistEventHandlers();
     initializeFavoritesEventHandlers();
     initializeCustomPlaylistEventHandlers();
@@ -3857,7 +3750,6 @@ function updateCurrentSongInfo(song, options = {}) {
     // 修复艺人名称显示问题 - 使用正确的字段名
     const artistText = Array.isArray(song.artist) ? song.artist.join(', ') : (song.artist || '未知艺术家');
     dom.currentSongArtist.textContent = artistText;
-    publishMiniPlayerState({ immediate: true });
 
     cancelDeferredPaletteUpdate();
 
@@ -3865,7 +3757,6 @@ function updateCurrentSongInfo(song, options = {}) {
         dom.albumCover.classList.add("loading");
         dom.albumCover.innerHTML = PLACEHOLDER_HTML;
         state.currentArtworkUrl = null;
-        publishMiniPlayerState({ immediate: true });
         return Promise.resolve();
     }
 
