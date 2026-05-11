@@ -59,6 +59,39 @@ html.desktop-view .playlist-action-btn:disabled {
     cursor: not-allowed;
 }
 
+html.desktop-view .mini-player-btn {
+    height: 38px;
+    padding: 0 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.48);
+    color: var(--text-secondary-color);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+
+html.desktop-view .mini-player-btn:hover,
+html.desktop-view .mini-player-btn:focus-visible {
+    color: var(--primary-color);
+    background: rgba(255, 255, 255, 0.72);
+    border-color: color-mix(in srgb, var(--primary-color) 42%, var(--border-color));
+}
+
+html.desktop-view body.dark-mode .mini-player-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: var(--text-secondary-color);
+}
+
+html.desktop-view body.dark-mode .mini-player-btn:hover,
+html.desktop-view body.dark-mode .mini-player-btn:focus-visible {
+    color: var(--primary-color);
+    background: rgba(255, 255, 255, 0.14);
+}
+
 /* Keep the desktop search import button visible without an opaque bar */
 html.desktop-view .search-results {
     gap: 0;

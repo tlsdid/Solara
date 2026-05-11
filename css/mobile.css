@@ -104,6 +104,7 @@ body.mobile-view .container::after {
 
 body.mobile-view .header,
 body.mobile-view .theme-switch-wrapper,
+body.mobile-view #miniPlayerBtn,
 body.mobile-view .warning {
     display: none !important;
 }
