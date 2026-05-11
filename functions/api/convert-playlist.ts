@@ -1,288 +1,469 @@
-<!doctype html>
-<html lang="zh-CN">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Solara 歌单转换器</title>
-  <style>
-    :root {
-      color-scheme: light dark;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-      background: #f5f5f2;
-      color: #191919;
+const API_BASE_URL = "https://music-api.gdstudio.xyz/api.php";
+const SOLARA_VERSION = 1;
+
+type AnyRecord = Record<string, any>;
+
+const JSON_HEADERS = {
+  "Content-Type": "application/json; charset=utf-8",
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST,OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
+export async function onRequest(context: any): Promise<Response> {
+  const request = context.request as Request;
+  const method = request.method.toUpperCase();
+
+  if (method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: JSON_HEADERS });
+  }
+
+  if (method !== "POST") {
+    return jsonResponse({ ok: false, error: "Method not allowed" }, 405);
+  }
+
+  try {
+    const body = await request.json().catch(() => ({})) as AnyRecord;
+    const inputUrl = String(body.url || "").trim();
+    const mode = normalizeMode(String(body.mode || "auto"));
+    const count = clampInteger(Number.parseInt(String(body.count || "10"), 10), 1, 30, 10);
+    const limit = clampInteger(Number.parseInt(String(body.limit || "120"), 10), 1, 300, 120);
+
+    if (!inputUrl) {
+      return jsonResponse({ ok: false, error: "请输入歌单链接" }, 400);
     }
 
-    body {
-      margin: 0;
-      min-height: 100vh;
-      display: grid;
-      place-items: center;
-      padding: 18px;
-      box-sizing: border-box;
+    const sourceMode = mode === "auto" ? detectModeFromUrl(inputUrl) : mode;
+    const rawItems = await fetchPlaylistFromUrl(inputUrl);
+    const tracks = extractTracks(rawItems).slice(0, limit);
+
+    if (tracks.length === 0) {
+      return jsonResponse({ ok: false, error: "没有识别到歌曲" }, 400);
     }
 
-    .card {
-      width: min(100%, 520px);
-      background: rgba(255,255,255,.86);
-      border: 1px solid rgba(0,0,0,.08);
-      border-radius: 24px;
-      box-shadow: 0 18px 50px rgba(0,0,0,.08);
-      padding: 22px;
-      box-sizing: border-box;
-    }
+    const converted: AnyRecord[] = [];
+    const missing: AnyRecord[] = [];
 
-    h1 {
-      margin: 0 0 8px;
-      font-size: 24px;
-      letter-spacing: -0.02em;
-    }
+    for (let index = 0; index < tracks.length; index += 1) {
+      const rawTrack = tracks[index];
+      const track = normalizeTrack(rawTrack);
 
-    p {
-      margin: 0 0 18px;
-      font-size: 14px;
-      color: #666;
-      line-height: 1.6;
-    }
-
-    label {
-      display: block;
-      margin: 14px 0 6px;
-      font-size: 13px;
-      color: #555;
-    }
-
-    input,
-    select,
-    button {
-      width: 100%;
-      box-sizing: border-box;
-      border-radius: 14px;
-      border: 1px solid rgba(0,0,0,.12);
-      font: inherit;
-    }
-
-    input,
-    select {
-      padding: 12px 13px;
-      background: rgba(255,255,255,.92);
-      color: #111;
-      outline: none;
-    }
-
-    button {
-      margin-top: 16px;
-      padding: 13px 14px;
-      border: 0;
-      background: #191919;
-      color: #fff;
-      font-weight: 700;
-      cursor: pointer;
-    }
-
-    button:disabled {
-      opacity: .55;
-      cursor: not-allowed;
-    }
-
-    .row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-
-    .downloads {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 10px;
-      margin-top: 12px;
-    }
-
-    .downloads button {
-      margin-top: 0;
-      background: #fff;
-      color: #111;
-      border: 1px solid rgba(0,0,0,.12);
-    }
-
-    .status {
-      margin-top: 14px;
-      padding: 12px;
-      border-radius: 14px;
-      background: rgba(0,0,0,.04);
-      font-size: 13px;
-      line-height: 1.6;
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-
-    @media (prefers-color-scheme: dark) {
-      :root {
-        background: #111;
-        color: #f5f5f5;
+      if (!track.name) {
+        missing.push({ index: index + 1, reason: "missing song name", raw: rawTrack });
+        continue;
       }
 
-      .card {
-        background: rgba(32,32,32,.9);
-        border-color: rgba(255,255,255,.1);
+      if (sourceMode === "netease" && track.id && isLikelyNumericId(track.id)) {
+        converted.push(toSolaraSong({
+          id: track.id,
+          name: track.name,
+          artist: track.artist,
+          album: track.album,
+          pic_id: track.picId,
+          source: "netease",
+        }));
+        continue;
       }
 
-      p,
-      label {
-        color: #b8b8b8;
-      }
+      const searchSource = sourceMode === "qq" ? "kuwo" : sourceMode;
+      const keyword = buildSearchKeyword(track);
+      const results = await searchMusic(keyword, searchSource, count);
+      const match = pickBestMatch(track, results);
 
-      input,
-      select {
-        background: rgba(255,255,255,.08);
-        border-color: rgba(255,255,255,.14);
-        color: #f5f5f5;
-      }
-
-      button {
-        background: #f5f5f5;
-        color: #111;
-      }
-
-      .downloads button {
-        background: rgba(255,255,255,.08);
-        color: #f5f5f5;
-        border-color: rgba(255,255,255,.14);
-      }
-
-      .status {
-        background: rgba(255,255,255,.08);
-      }
-    }
-  </style>
-</head>
-<body>
-  <main class="card">
-    <h1>Solara 歌单转换器</h1>
-    <p>粘贴网易云或 QQ 音乐歌单链接，转换成 Solara 可导入的 JSON 文件。</p>
-
-    <label for="playlistUrl">歌单链接</label>
-    <input id="playlistUrl" type="url" placeholder="https://music.163.com/playlist?id=..." />
-
-    <div class="row">
-      <div>
-        <label for="mode">来源</label>
-        <select id="mode">
-          <option value="auto">自动识别</option>
-          <option value="netease">网易云</option>
-          <option value="qq">QQ 音乐</option>
-          <option value="kuwo">酷我搜索</option>
-        </select>
-      </div>
-
-      <div>
-        <label for="limit">最多转换</label>
-        <select id="limit">
-          <option value="50">50 首</option>
-          <option value="120" selected>120 首</option>
-          <option value="200">200 首</option>
-          <option value="300">300 首</option>
-        </select>
-      </div>
-    </div>
-
-    <button id="convertBtn" type="button">开始转换</button>
-
-    <div class="status" id="status">等待输入。</div>
-
-    <div class="downloads">
-      <button id="downloadPlaylistBtn" type="button" disabled>下载 Solara JSON</button>
-      <button id="downloadMissingBtn" type="button" disabled>下载未匹配报告</button>
-    </div>
-  </main>
-
-  <script>
-    const playlistUrl = document.getElementById("playlistUrl");
-    const mode = document.getElementById("mode");
-    const limit = document.getElementById("limit");
-    const convertBtn = document.getElementById("convertBtn");
-    const statusBox = document.getElementById("status");
-    const downloadPlaylistBtn = document.getElementById("downloadPlaylistBtn");
-    const downloadMissingBtn = document.getElementById("downloadMissingBtn");
-
-    let latestResult = null;
-
-    convertBtn.addEventListener("click", async () => {
-      const url = playlistUrl.value.trim();
-
-      if (!url) {
-        statusBox.textContent = "请输入歌单链接。";
-        return;
-      }
-
-      latestResult = null;
-      downloadPlaylistBtn.disabled = true;
-      downloadMissingBtn.disabled = true;
-      convertBtn.disabled = true;
-      statusBox.textContent = "转换中。大歌单需要等待一段时间。";
-
-      try {
-        const response = await fetch("/api/convert-playlist", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            url,
-            mode: mode.value,
-            limit: limit.value,
-            count: 10,
-          }),
+      if (!match) {
+        missing.push({
+          index: index + 1,
+          reason: `not found on ${searchSource}`,
+          keyword,
+          name: track.name,
+          artist: track.artist,
+          album: track.album,
+          raw: rawTrack,
         });
-
-        const data = await response.json();
-
-        if (!response.ok || !data.ok) {
-          throw new Error(data.error || "转换失败");
-        }
-
-        latestResult = data;
-
-        statusBox.textContent = [
-          "转换完成。",
-          `来源：${data.summary.sourceMode}`,
-          `识别歌曲：${data.summary.total}`,
-          `成功转换：${data.summary.converted}`,
-          `未匹配：${data.summary.missing}`,
-        ].join("\n");
-
-        downloadPlaylistBtn.disabled = false;
-        downloadMissingBtn.disabled = false;
-      } catch (error) {
-        statusBox.textContent = `转换失败：${error.message || error}`;
-      } finally {
-        convertBtn.disabled = false;
+        continue;
       }
-    });
 
-    downloadPlaylistBtn.addEventListener("click", () => {
-      if (!latestResult) return;
-      downloadJson(latestResult.payload, latestResult.filenames.playlist || "solara-playlist.json");
-    });
+      converted.push(toSolaraSong({ ...match, source: searchSource }));
+    }
 
-    downloadMissingBtn.addEventListener("click", () => {
-      if (!latestResult) return;
-      downloadJson(latestResult.missing, latestResult.filenames.missing || "solara-playlist-not-found.json");
-    });
+    const payload = {
+      meta: {
+        app: "Solara",
+        version: SOLARA_VERSION,
+        exportedAt: new Date().toISOString(),
+        itemCount: converted.length,
+        sourceMode,
+        missingCount: missing.length,
+        inputUrl,
+      },
+      items: converted,
+    };
 
-    function downloadJson(data, filename) {
-      const blob = new Blob([JSON.stringify(data, null, 2) + "\n"], {
-        type: "application/json;charset=utf-8",
+    const stamp = timestamp();
+
+    return jsonResponse({
+      ok: true,
+      payload,
+      missing: { missing },
+      filenames: {
+        playlist: `solara-playlist-${sourceMode}-${stamp}.json`,
+        missing: `solara-playlist-${sourceMode}-${stamp}-not-found.json`,
+      },
+      summary: {
+        total: tracks.length,
+        converted: converted.length,
+        missing: missing.length,
+        sourceMode,
+      },
+    });
+  } catch (error: any) {
+    return jsonResponse({ ok: false, error: error?.message || "转换失败" }, 500);
+  }
+}
+
+function jsonResponse(data: unknown, status = 200): Response {
+  return new Response(JSON.stringify(data, null, 2), { status, headers: JSON_HEADERS });
+}
+
+function normalizeMode(value: string): string {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "auto") return "auto";
+  if (normalized === "qq" || normalized === "tencent") return "qq";
+  if (normalized === "netease" || normalized === "163") return "netease";
+  if (normalized === "kuwo") return "kuwo";
+  throw new Error(`不支持的来源：${value}`);
+}
+
+function detectModeFromUrl(url: string): string {
+  if (isQqMusicUrl(url)) return "qq";
+  if (/kuwo|kwai|kuwo\.cn/i.test(url)) return "kuwo";
+  return "netease";
+}
+
+async function fetchPlaylistFromUrl(url: string): Promise<any[]> {
+  if (isQqMusicUrl(url)) return fetchQqPlaylistFromUrl(url);
+  return fetchNetEasePlaylistFromUrl(url);
+}
+
+function isQqMusicUrl(url: string): boolean {
+  return /(^|\/\/|\.)(y|i2?)\.qq\.com/i.test(String(url || ""));
+}
+
+async function fetchQqPlaylistFromUrl(url: string): Promise<any[]> {
+  const playlistId = extractQqPlaylistId(url);
+  if (!playlistId) throw new Error(`无法从 QQ 音乐链接中识别歌单 ID：${url}`);
+
+  const params = new URLSearchParams({
+    type: "1",
+    json: "1",
+    utf8: "1",
+    onlysong: "0",
+    disstid: playlistId,
+    format: "json",
+    g_tk: "5381",
+    loginUin: "0",
+    hostUin: "0",
+    inCharset: "utf8",
+    outCharset: "utf-8",
+    notice: "0",
+    platform: "yqq.json",
+    needNewCode: "0",
+  });
+
+  const response = await fetch(`https://c.y.qq.com/qzone/fcg-bin/fcg_ucc_getcdinfo_byids_cp.fcg?${params.toString()}`, {
+    headers: {
+      "User-Agent": "Mozilla/5.0",
+      "Referer": "https://y.qq.com/",
+      "Origin": "https://y.qq.com",
+    },
+  });
+
+  if (!response.ok) throw new Error(`QQ 音乐歌单请求失败：${response.status}`);
+
+  const data = await response.json() as AnyRecord;
+  const playlist = data?.cdlist?.[0];
+
+  if (!playlist || !Array.isArray(playlist.songlist)) {
+    throw new Error("QQ 音乐歌单返回异常");
+  }
+
+  return playlist.songlist;
+}
+
+function extractQqPlaylistId(url: string): string {
+  const text = String(url || "").trim();
+  const query = text.match(/[?&]id=(\d+)/);
+  if (query) return query[1];
+  const pathMatch = text.match(/\/playlist\/(\d+)/);
+  if (pathMatch) return pathMatch[1];
+  const direct = text.match(/^\d+$/);
+  return direct ? direct[0] : "";
+}
+
+async function fetchNetEasePlaylistFromUrl(url: string): Promise<any[]> {
+  const playlistId = extractNetEasePlaylistId(url);
+  if (!playlistId) throw new Error(`无法从网易云链接中识别歌单 ID：${url}`);
+
+  const playlist = await fetchNetEasePlaylist(playlistId);
+  const trackIds = Array.isArray(playlist.trackIds)
+    ? playlist.trackIds.map((item: AnyRecord) => item && item.id).filter(Boolean)
+    : [];
+
+  if (trackIds.length === 0) {
+    return Array.isArray(playlist.tracks) ? playlist.tracks : [];
+  }
+
+  const tracks: any[] = [];
+  const batchSize = 200;
+
+  for (let index = 0; index < trackIds.length; index += batchSize) {
+    const batch = trackIds.slice(index, index + batchSize);
+    const details = await fetchNetEaseSongDetails(batch);
+    tracks.push(...details);
+  }
+
+  return tracks;
+}
+
+function extractNetEasePlaylistId(url: string): string {
+  const text = String(url || "").trim();
+  const direct = text.match(/(?:playlist\?id=|[?&]id=)(\d+)/);
+  if (direct) return direct[1];
+  const numeric = text.match(/^\d+$/);
+  return numeric ? numeric[0] : "";
+}
+
+async function fetchNetEasePlaylist(id: string): Promise<AnyRecord> {
+  const response = await fetch(`https://music.163.com/api/v6/playlist/detail?id=${encodeURIComponent(id)}`, {
+    headers: { "User-Agent": "Mozilla/5.0", "Referer": "https://music.163.com/" },
+  });
+
+  if (!response.ok) throw new Error(`网易云歌单请求失败：${response.status}`);
+
+  const data = parseNetEaseJson(await response.text());
+  if (!data || data.code !== 200 || !data.playlist) {
+    throw new Error("网易云歌单返回异常");
+  }
+
+  return data.playlist;
+}
+
+async function fetchNetEaseSongDetails(ids: any[]): Promise<any[]> {
+  const response = await fetch(`https://music.163.com/api/song/detail?ids=[${ids.join(",")}]`, {
+    headers: { "User-Agent": "Mozilla/5.0", "Referer": "https://music.163.com/" },
+  });
+
+  if (!response.ok) throw new Error(`网易云歌曲详情请求失败：${response.status}`);
+
+  const data = parseNetEaseJson(await response.text());
+  return Array.isArray(data.songs) ? data.songs : [];
+}
+
+function parseNetEaseJson(text: string): AnyRecord {
+  const protectedText = String(text).replace(
+    /("(?:id|pic|picId|picid|albumId|copyrightId|commentThreadId|trackNumberUpdateTime|subscribedCount|playCount|shareCount|commentCount)"\s*:\s*)(-?\d{16,})/g,
+    '$1"$2"',
+  );
+  return JSON.parse(protectedText);
+}
+
+function extractTracks(payload: any): any[] {
+  if (Array.isArray(payload)) return payload;
+  if (!payload || typeof payload !== "object") return [];
+
+  for (const key of ["items", "songs", "tracks", "playlist", "data", "list"]) {
+    const value = payload[key];
+    if (Array.isArray(value)) return value;
+    if (value && typeof value === "object") {
+      const nested = extractTracks(value);
+      if (nested.length > 0) return nested;
+    }
+  }
+
+  return [];
+}
+
+function normalizeTrack(raw: AnyRecord): AnyRecord {
+  const name = firstString(raw?.name, raw?.songname, raw?.songName, raw?.title, raw?.song_title);
+  const id = firstString(raw?.id, raw?.songid, raw?.songmid, raw?.mid, raw?.musicId);
+  const album = normalizeAlbum(raw?.album, raw?.albumname, raw?.albumName, raw?.al);
+  const artist = normalizeArtists(raw?.artist, raw?.artists, raw?.singer, raw?.singers, raw?.ar);
+  const picId = firstString(
+    raw?.pic_id,
+    raw?.picId_str,
+    raw?.pic_id_str,
+    raw?.pic_str,
+    raw?.album?.picId_str,
+    raw?.album?.pic_id_str,
+    raw?.album?.pic_str,
+    raw?.album?.picId,
+    raw?.album?.pic,
+    raw?.al?.picId_str,
+    raw?.al?.pic_id_str,
+    raw?.al?.pic_str,
+    raw?.al?.picId,
+    raw?.al?.pic,
+    raw?.picId,
+    raw?.pic,
+  );
+
+  return { id, name, artist, album, picId };
+}
+
+function firstString(...values: any[]): string {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  }
+  return "";
+}
+
+function normalizeAlbum(...values: any[]): string {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (value && typeof value === "object") {
+      const name = firstString(value.name, value.title, value.albumname);
+      if (name) return name;
+    }
+  }
+  return "";
+}
+
+function normalizeArtists(...values: any[]): string[] {
+  for (const value of values) {
+    const artists = artistsFromValue(value);
+    if (artists.length > 0) return artists;
+  }
+  return [];
+}
+
+function artistsFromValue(value: any): string[] {
+  if (Array.isArray(value)) return value.flatMap(artistsFromValue).filter(Boolean);
+  if (typeof value === "string") {
+    return value.split(/\s*[/,、&]\s*/).map((item) => item.trim()).filter(Boolean);
+  }
+  if (value && typeof value === "object") {
+    const name = firstString(value.name, value.title, value.singername);
+    return name ? [name] : [];
+  }
+  return [];
+}
+
+function isLikelyNumericId(value: any): boolean {
+  return /^\d+$/.test(String(value));
+}
+
+function buildSearchKeyword(track: AnyRecord): string {
+  return [track.name, track.artist?.[0] || ""].filter(Boolean).join(" ");
+}
+
+async function searchMusic(keyword: string, source: string, count: number): Promise<any[]> {
+  let lastError: any = null;
+
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const signature = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+      const params = new URLSearchParams({
+        types: "search",
+        source,
+        name: keyword,
+        count: String(count),
+        pages: "1",
+        s: signature,
       });
 
-      const href = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = href;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(href);
+      const response = await fetch(`${API_BASE_URL}?${params.toString()}`, {
+        headers: { Accept: "application/json" },
+      });
+
+      if (!response.ok) throw new Error(`搜索失败：${keyword}`);
+
+      const data = await response.json();
+      await delay(80);
+      return Array.isArray(data) ? data : [];
+    } catch (error) {
+      lastError = error;
+      if (attempt < 3) await delay(300 * attempt);
     }
-  </script>
-</body>
-</html>
+  }
+
+  throw lastError;
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function pickBestMatch(track: AnyRecord, results: any[]): AnyRecord | null {
+  const scored = results
+    .map((song) => ({ song, score: scoreMatch(track, song) }))
+    .filter((entry) => entry.score >= 60)
+    .sort((a, b) => b.score - a.score);
+
+  return scored[0]?.song || null;
+}
+
+function scoreMatch(track: AnyRecord, song: AnyRecord): number {
+  const wantedName = normalizeText(track.name);
+  const foundName = normalizeText(song.name);
+
+  if (!wantedName || !foundName) return 0;
+
+  let score = 0;
+
+  if (wantedName === foundName) score += 70;
+  else if (wantedName.includes(foundName) || foundName.includes(wantedName)) score += 45;
+
+  const wantedArtists = track.artist.map(normalizeText).filter(Boolean);
+  const foundArtists = normalizeArtists(song.artist, song.artists, song.singer).map(normalizeText).filter(Boolean);
+
+  if (wantedArtists.length === 0 || foundArtists.length === 0) score += 10;
+  else if (wantedArtists.some((wanted: string) => foundArtists.some((found: string) => wanted === found || wanted.includes(found) || found.includes(wanted)))) score += 30;
+
+  const wantedAlbum = normalizeText(track.album);
+  const foundAlbum = normalizeText(normalizeAlbum(song.album));
+
+  if (wantedAlbum && foundAlbum && (wantedAlbum === foundAlbum || wantedAlbum.includes(foundAlbum) || foundAlbum.includes(wantedAlbum))) score += 10;
+
+  return score;
+}
+
+function normalizeText(value: any): string {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/\([^)]*\)|（[^）]*）|\[[^\]]*\]|【[^】]*】/g, "")
+    .replace(/[^\p{L}\p{N}]+/gu, "");
+}
+
+function toSolaraSong(song: AnyRecord): AnyRecord {
+  const id = firstString(song.id, song.url_id, song.lyric_id);
+
+  return {
+    id,
+    name: firstString(song.name),
+    artist: normalizeArtists(song.artist, song.artists, song.singer),
+    album: normalizeAlbum(song.album),
+    pic_id: firstString(song.pic_id, song.picId, song.pic, id),
+    url_id: firstString(song.url_id, id),
+    lyric_id: firstString(song.lyric_id, id),
+    source: firstString(song.source, "netease"),
+  };
+}
+
+function timestamp(): string {
+  const now = new Date();
+  return [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+    "-",
+    String(now.getHours()).padStart(2, "0"),
+    String(now.getMinutes()).padStart(2, "0"),
+    String(now.getSeconds()).padStart(2, "0"),
+  ].join("");
+}
+
+function clampInteger(value: number, min: number, max: number, fallback: number): number {
+  if (!Number.isInteger(value)) return fallback;
+  return Math.min(Math.max(value, min), max);
+}

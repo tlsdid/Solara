@@ -11,7 +11,6 @@
       background: #f5f5f2;
       color: #191919;
     }
-
     body {
       margin: 0;
       min-height: 100vh;
@@ -20,7 +19,6 @@
       padding: 18px;
       box-sizing: border-box;
     }
-
     .card {
       width: min(100%, 520px);
       background: rgba(255,255,255,.86);
@@ -30,45 +28,36 @@
       padding: 22px;
       box-sizing: border-box;
     }
-
     h1 {
       margin: 0 0 8px;
       font-size: 24px;
       letter-spacing: -0.02em;
     }
-
     p {
       margin: 0 0 18px;
       font-size: 14px;
       color: #666;
       line-height: 1.6;
     }
-
     label {
       display: block;
       margin: 14px 0 6px;
       font-size: 13px;
       color: #555;
     }
-
-    input,
-    select,
-    button {
+    input, select, button {
       width: 100%;
       box-sizing: border-box;
       border-radius: 14px;
       border: 1px solid rgba(0,0,0,.12);
       font: inherit;
     }
-
-    input,
-    select {
+    input, select {
       padding: 12px 13px;
       background: rgba(255,255,255,.92);
       color: #111;
       outline: none;
     }
-
     button {
       margin-top: 16px;
       padding: 13px 14px;
@@ -78,32 +67,27 @@
       font-weight: 700;
       cursor: pointer;
     }
-
     button:disabled {
       opacity: .55;
       cursor: not-allowed;
     }
-
     .row {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 10px;
     }
-
     .downloads {
       display: grid;
       grid-template-columns: 1fr;
       gap: 10px;
       margin-top: 12px;
     }
-
     .downloads button {
       margin-top: 0;
       background: #fff;
       color: #111;
       border: 1px solid rgba(0,0,0,.12);
     }
-
     .status {
       margin-top: 14px;
       padding: 12px;
@@ -114,44 +98,14 @@
       white-space: pre-wrap;
       word-break: break-word;
     }
-
     @media (prefers-color-scheme: dark) {
-      :root {
-        background: #111;
-        color: #f5f5f5;
-      }
-
-      .card {
-        background: rgba(32,32,32,.9);
-        border-color: rgba(255,255,255,.1);
-      }
-
-      p,
-      label {
-        color: #b8b8b8;
-      }
-
-      input,
-      select {
-        background: rgba(255,255,255,.08);
-        border-color: rgba(255,255,255,.14);
-        color: #f5f5f5;
-      }
-
-      button {
-        background: #f5f5f5;
-        color: #111;
-      }
-
-      .downloads button {
-        background: rgba(255,255,255,.08);
-        color: #f5f5f5;
-        border-color: rgba(255,255,255,.14);
-      }
-
-      .status {
-        background: rgba(255,255,255,.08);
-      }
+      :root { background: #111; color: #f5f5f5; }
+      .card { background: rgba(32,32,32,.9); border-color: rgba(255,255,255,.1); }
+      p, label { color: #b8b8b8; }
+      input, select { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.14); color: #f5f5f5; }
+      button { background: #f5f5f5; color: #111; }
+      .downloads button { background: rgba(255,255,255,.08); color: #f5f5f5; border-color: rgba(255,255,255,.14); }
+      .status { background: rgba(255,255,255,.08); }
     }
   </style>
 </head>
@@ -173,7 +127,6 @@
           <option value="kuwo">酷我搜索</option>
         </select>
       </div>
-
       <div>
         <label for="limit">最多转换</label>
         <select id="limit">
@@ -186,7 +139,6 @@
     </div>
 
     <button id="convertBtn" type="button">开始转换</button>
-
     <div class="status" id="status">等待输入。</div>
 
     <div class="downloads">
@@ -203,12 +155,10 @@
     const statusBox = document.getElementById("status");
     const downloadPlaylistBtn = document.getElementById("downloadPlaylistBtn");
     const downloadMissingBtn = document.getElementById("downloadMissingBtn");
-
     let latestResult = null;
 
     convertBtn.addEventListener("click", async () => {
       const url = playlistUrl.value.trim();
-
       if (!url) {
         statusBox.textContent = "请输入歌单链接。";
         return;
@@ -223,25 +173,18 @@
       try {
         const response = await fetch("/api/convert-playlist", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             url,
             mode: mode.value,
-            limit: limit.value,
+            limit: Number(limit.value),
             count: 10,
           }),
         });
-
         const data = await response.json();
-
-        if (!response.ok || !data.ok) {
-          throw new Error(data.error || "转换失败");
-        }
+        if (!response.ok || !data.ok) throw new Error(data.error || "转换失败");
 
         latestResult = data;
-
         statusBox.textContent = [
           "转换完成。",
           `来源：${data.summary.sourceMode}`,
@@ -273,7 +216,6 @@
       const blob = new Blob([JSON.stringify(data, null, 2) + "\n"], {
         type: "application/json;charset=utf-8",
       });
-
       const href = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = href;
