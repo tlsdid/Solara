@@ -1085,3 +1085,25 @@ body.mobile-view #notification.show {
 body.mobile-view .debug-info {
     display: none;
 }
+
+/* Mobile: remove outer phone-shell frame and let UI fill the page */
+body.mobile-view {
+  padding: 0 !important;
+  justify-content: stretch !important;
+  align-items: stretch !important;
+}
+
+body.mobile-view .container {
+  width: 100% !important;
+  max-width: none !important;
+  min-height: var(--mobile-vh, 100dvh) !important;
+  height: var(--mobile-vh, 100dvh) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: calc(env(safe-area-inset-top) + 14px) clamp(16px, 5vw, 24px) calc(env(safe-area-inset-bottom) + 18px) !important;
+  margin: 0 !important;
+}
+
+body.mobile-view .container::after {
+  border-radius: 0 !important;
+}
