@@ -1108,27 +1108,31 @@ body.mobile-view .container::after {
   border-radius: 0 !important;
 }
 
-/* Mobile: center Solara title when top bar has asymmetric buttons */
-body.mobile-view .top-bar,
-body.mobile-view .mobile-top-bar,
-body.mobile-view .mobile-now-playing-top,
-body.mobile-view .now-playing-header {
+/* Mobile: center toolbar title after adding theme + search buttons */
+body.mobile-view .mobile-toolbar {
   position: relative !important;
+  display: grid !important;
+  grid-template-columns: 88px 1fr 88px !important;
+  align-items: center !important;
 }
 
-body.mobile-view .top-bar h1,
-body.mobile-view .mobile-top-bar h1,
-body.mobile-view .mobile-now-playing-top h1,
-body.mobile-view .now-playing-header h1,
-body.mobile-view .top-bar .title,
-body.mobile-view .mobile-top-bar .title,
-body.mobile-view .mobile-now-playing-top .title,
-body.mobile-view .now-playing-header .title {
-  position: absolute !important;
-  left: 50% !important;
-  transform: translateX(-50%) !important;
-  margin: 0 !important;
+body.mobile-view .mobile-toolbar__title {
+  grid-column: 2 !important;
+  justify-self: center !important;
   text-align: center !important;
-  width: max-content !important;
-  pointer-events: none !important;
+  margin: 0 !important;
+  transform: none !important;
+}
+
+body.mobile-view .mobile-toolbar > .mobile-toolbar__button {
+  grid-column: 1 !important;
+  justify-self: start !important;
+}
+
+body.mobile-view .mobile-toolbar__actions {
+  grid-column: 3 !important;
+  justify-self: end !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
 }
