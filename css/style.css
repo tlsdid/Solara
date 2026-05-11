@@ -3582,3 +3582,47 @@ html.desktop-view body.dark-mode .search-result-artist {
     height: 0;
   }
 }
+
+/* Mobile: custom playlist actions in one row */
+@media (max-width: 768px) {
+  body.mobile-view[data-mobile-panel-view="custom"] #mobileCreateCustomPlaylistBtn {
+    display: none !important;
+  }
+
+  body.mobile-view[data-mobile-panel-view="custom"] #mobileCustomPlaylistActions {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    gap: 12px !important;
+    width: auto !important;
+    margin: 0 !important;
+  }
+
+  body.mobile-view[data-mobile-panel-view="custom"] #mobileCustomPlaylistActions::before {
+    display: none !important;
+    content: none !important;
+    flex-basis: auto !important;
+  }
+
+  body.mobile-view[data-mobile-panel-view="custom"] #mobilePanelClose {
+    display: inline-flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: static !important;
+    transform: none !important;
+    order: 99 !important;
+    margin: 0 !important;
+  }
+
+  body.mobile-view[data-mobile-panel-view="custom"] #customPlaylists .playlist-actions-tray {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    gap: 12px !important;
+    margin-top: -68px !important;
+    margin-bottom: 20px !important;
+    padding-right: 64px !important;
+  }
+}
