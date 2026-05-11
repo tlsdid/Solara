@@ -61,6 +61,7 @@ const dom = {
     playerQualityMenu: document.getElementById("playerQualityMenu"),
     qualityLabel: document.getElementById("qualityLabel"),
     mobileToolbarTitle: document.getElementById("mobileToolbarTitle"),
+    mobileThemeToggleButton: document.getElementById("mobileThemeToggleButton"),
     mobileSearchToggle: document.getElementById("mobileSearchToggle"),
     mobileSearchClose: document.getElementById("mobileSearchClose"),
     mobilePanelClose: document.getElementById("mobilePanelClose"),
@@ -3324,10 +3325,14 @@ function setupInteractions() {
             captureThemeDefaults();
         }
         document.body.classList.toggle("dark-mode", isDark);
-        dom.themeToggleButton.classList.toggle("is-dark", isDark);
+        [dom.themeToggleButton, dom.mobileThemeToggleButton].filter(Boolean).forEach((button) => {
+            button.classList.toggle("is-dark", isDark);
+        });
         const label = isDark ? "切换为浅色模式" : "切换为深色模式";
-        dom.themeToggleButton.setAttribute("aria-label", label);
-        dom.themeToggleButton.setAttribute("title", label);
+        [dom.themeToggleButton, dom.mobileThemeToggleButton].filter(Boolean).forEach((button) => {
+            button.setAttribute("aria-label", label);
+            button.setAttribute("title", label);
+        });
         applyDynamicGradient();
     }
 
@@ -3337,10 +3342,13 @@ function setupInteractions() {
     const initialIsDark = savedTheme ? savedTheme === "dark" : prefersDark;
     applyTheme(initialIsDark);
 
-    dom.themeToggleButton.addEventListener("click", () => {
+    const handleThemeToggle = () => {
         const isDark = !document.body.classList.contains("dark-mode");
         applyTheme(isDark);
         safeSetLocalStorage("theme", isDark ? "dark" : "light");
+    };
+    [dom.themeToggleButton, dom.mobileThemeToggleButton].filter(Boolean).forEach((button) => {
+        button.addEventListener("click", handleThemeToggle);
     });
 
     dom.audioPlayer.volume = state.volume;
