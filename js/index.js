@@ -69,6 +69,8 @@ const dom = {
     mobileFavoritesActions: document.getElementById("mobileFavoritesActions"),
     mobileCustomPlaylistActions: document.getElementById("mobileCustomPlaylistActions"),
     mobileCreateCustomPlaylistBtn: document.getElementById("mobileCreateCustomPlaylistBtn"),
+    mobileRenameCustomPlaylistBtn: document.getElementById("mobileRenameCustomPlaylistBtn"),
+    mobileDeleteCustomPlaylistBtn: document.getElementById("mobileDeleteCustomPlaylistBtn"),
     mobileAddAllFavoritesBtn: document.getElementById("mobileAddAllFavoritesBtn"),
     mobileImportFavoritesBtn: document.getElementById("mobileImportFavoritesBtn"),
     mobileExportFavoritesBtn: document.getElementById("mobileExportFavoritesBtn"),
@@ -3256,6 +3258,20 @@ function setupInteractions() {
             });
         }
 
+        if (dom.mobileRenameCustomPlaylistBtn) {
+            dom.mobileRenameCustomPlaylistBtn.addEventListener("click", (event) => {
+                event.preventDefault();
+                renameSelectedCustomPlaylist();
+            });
+        }
+
+        if (dom.mobileDeleteCustomPlaylistBtn) {
+            dom.mobileDeleteCustomPlaylistBtn.addEventListener("click", (event) => {
+                event.preventDefault();
+                deleteSelectedCustomPlaylist();
+            });
+        }
+
         if (dom.customPlaylistSelector) {
             dom.customPlaylistSelector.addEventListener("click", (event) => {
                 const button = event.target.closest("[data-custom-playlist-id]");
@@ -5233,7 +5249,12 @@ function renderCustomPlaylists() {
 
     const playlists = ensureCustomPlaylistsArray();
     dom.customPlaylists.classList.toggle("empty", playlists.length === 0);
-    [dom.renameCustomPlaylistBtn, dom.deleteCustomPlaylistBtn].forEach((button) => {
+    [
+        dom.renameCustomPlaylistBtn,
+        dom.deleteCustomPlaylistBtn,
+        dom.mobileRenameCustomPlaylistBtn,
+        dom.mobileDeleteCustomPlaylistBtn,
+    ].forEach((button) => {
         if (button) {
             button.disabled = playlists.length === 0;
         }
