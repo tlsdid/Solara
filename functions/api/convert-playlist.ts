@@ -1,15 +1,19 @@
 const API_BASE_URL = "https://music-api.gdstudio.xyz/api.php";
+const GD_SIGNATURE_HOST = "music.gdstudio.xyz";
+const GD_VERSION = "2025.11.4";
 const SOLARA_VERSION = 1;
+const FETCH_TIMEOUT_MS = 9000;
+const SEARCH_CONCURRENCY = 5;
 
-type SourceMode = "auto" | "netease" | "qq" | "kuwo";
+type SourceMode = "auto" | "netease" | "qq" | "kuwo" | "tencent";
 
 export const onRequestPost: PagesFunction = async ({ request }) => {
   try {
-    const body = (await request.json()) as any;
+    const body = (await request.json()) as Record<string, unknown>;
     const inputUrl = String(body.url || "").trim();
-    const mode = normalizeMode(body.mode || "auto");
+    const mode = normalizeMode(String(body.mode || "auto"));
     const count = clampInteger(Number.parseInt(String(body.count || "10"), 10), 1, 30, 10);
-    const limit = clampInteger(Number.parseInt(String(body.limit || "120"), 10), 1, 300, 120);
+    const limit = clampInteger(Number.parseInt(String(body.limit || "50"), 10), 1, 120, 50);
 
     if (!inputUrl) {
       return jsonResponse({ ok: false, error: "请输入歌单链接" }, 400);
@@ -23,52 +27,11 @@ export const onRequestPost: PagesFunction = async ({ request }) => {
       return jsonResponse({ ok: false, error: "没有识别到歌曲。请确认粘贴的是完整歌单链接。" }, 400);
     }
 
-    const converted: any[] = [];
-    const missing: any[] = [];
+    const results = await convertTracksInBatches(tracks, sourceMode, count);
+    const converted = results.flatMap((item) => item.converted ? [item.converted] : []);
+    const missing = results.flatMap((item) => item.missing ? [item.missing] : []);
 
-    for (let index = 0; index < tracks.length; index += 1) {
-      const rawTrack = tracks[index];
-      const track = normalizeTrack(rawTrack);
-
-      if (!track.name) {
-        missing.push({
-          index: index + 1,
-          reason: "missing song name",
-          raw: rawTrack,
-        });
-        continue;
-      }
-
-      if (sourceMode === "netease" && track.id && isLikelyNumericId(track.id)) {
-        converted.push(toSolaraSong({
-          id: track.id,
-          name: track.name,
-          artist: track.artist,
-          album: track.album,
-          pic_id: track.picId,
-          source: "netease",
-        }));
-        continue;
-      }
-
-      const matchResult = await findBestPlayableMatch(track, sourceMode, count);
-
-      if (!matchResult.song) {
-        missing.push({
-          index: index + 1,
-          reason: matchResult.reason || "not found",
-          tried: matchResult.tried,
-          name: track.name,
-          artist: track.artist,
-          album: track.album,
-          raw: rawTrack,
-        });
-        continue;
-      }
-
-      converted.push(toSolaraSong({ ...matchResult.song, source: matchResult.source }));
-    }
-
+    const stamp = timestamp();
     const payload = {
       meta: {
         app: "Solara",
@@ -81,8 +44,6 @@ export const onRequestPost: PagesFunction = async ({ request }) => {
       },
       items: converted,
     };
-
-    const stamp = timestamp();
 
     return jsonResponse({
       ok: true,
@@ -111,11 +72,104 @@ export const onRequestPost: PagesFunction = async ({ request }) => {
 };
 
 export const onRequestOptions: PagesFunction = async () => {
-  return new Response(null, {
-    status: 204,
-    headers: corsHeaders(),
-  });
+  return new Response(null, { status: 204, headers: corsHeaders() });
 };
+
+async function convertTracksInBatches(tracks: any[], sourceMode: Exclude<SourceMode, "auto">, count: number) {
+  const output: any[] = new Array(tracks.length);
+
+  for (let start = 0; start < tracks.length; start += SEARCH_CONCURRENCY) {
+    const batch = tracks.slice(start, start + SEARCH_CONCURRENCY);
+
+    const batchResults = await Promise.all(
+      batch.map((rawTrack, offset) => convertOneTrack(rawTrack, start + offset, sourceMode, count)),
+    );
+
+    batchResults.forEach((item, offset) => {
+      output[start + offset] = item;
+    });
+  }
+
+  return output;
+}
+
+async function convertOneTrack(rawTrack: any, index: number, sourceMode: Exclude<SourceMode, "auto">, count: number) {
+  const track = normalizeTrack(rawTrack);
+
+  if (!track.name) {
+    return {
+      missing: {
+        index: index + 1,
+        reason: "missing song name",
+        raw: rawTrack,
+      },
+    };
+  }
+
+  if (sourceMode === "netease" && track.id && isLikelyNumericId(track.id)) {
+    return {
+      converted: toSolaraSong({
+        id: track.id,
+        name: track.name,
+        artist: track.artist,
+        album: track.album,
+        pic_id: track.picId,
+        url_id: track.id,
+        lyric_id: track.id,
+        source: "netease",
+      }),
+    };
+  }
+
+  const searchSources = getSearchSources(sourceMode);
+  const keywords = buildSearchKeywords(track);
+  const tried: any[] = [];
+
+  for (const source of searchSources) {
+    for (const keyword of keywords) {
+      try {
+        const results = await searchMusic(keyword, source, count);
+        const match = pickBestMatch(track, results, keyword);
+
+        tried.push({
+          source,
+          keyword,
+          resultCount: results.length,
+          bestScore: match?.score || 0,
+          sample: results.slice(0, 2).map((item: any) => ({
+            name: item?.name,
+            artist: item?.artist,
+            source: item?.source,
+          })),
+        });
+
+        if (match && match.score >= 40) {
+          return {
+            converted: toSolaraSong({ ...match.song, source: match.song.source || source }),
+          };
+        }
+      } catch (error: any) {
+        tried.push({
+          source,
+          keyword,
+          error: error?.message || String(error),
+        });
+      }
+    }
+  }
+
+  return {
+    missing: {
+      index: index + 1,
+      reason: tried.some((item) => item.error) ? "search failed or timed out" : "not found",
+      tried,
+      name: track.name,
+      artist: track.artist,
+      album: track.album,
+      raw: rawTrack,
+    },
+  };
+}
 
 function jsonResponse(data: any, status = 200) {
   return new Response(JSON.stringify(data, null, 2), {
@@ -136,19 +190,17 @@ function corsHeaders() {
 }
 
 function normalizeMode(value: string): SourceMode {
-  const normalized = String(value || "").trim().toLowerCase();
-
+  const normalized = value.trim().toLowerCase();
   if (normalized === "auto") return "auto";
   if (normalized === "qq" || normalized === "tencent") return "qq";
   if (normalized === "netease" || normalized === "163") return "netease";
   if (normalized === "kuwo") return "kuwo";
-
   throw new Error(`不支持的来源：${value}`);
 }
 
 function detectModeFromUrl(url: string): Exclude<SourceMode, "auto"> {
   if (isQqMusicUrl(url)) return "qq";
-  if (/kuwo|kwai|kuwo\.cn/i.test(url)) return "kuwo";
+  if (/kuwo|kuwo\.cn/i.test(url)) return "kuwo";
   return "netease";
 }
 
@@ -161,7 +213,7 @@ async function fetchPlaylistFromUrl(url: string) {
 }
 
 function isQqMusicUrl(url: string) {
-  return /(^|\/\/|\.)(y|i2?)\.qq\.com/i.test(String(url || ""));
+  return /(^|\/\/|\.)(y|i2?)\.qq\.com/i.test(url);
 }
 
 async function fetchQqPlaylistFromUrl(url: string) {
@@ -188,15 +240,12 @@ async function fetchQqPlaylistFromUrl(url: string) {
     needNewCode: "0",
   });
 
-  const response = await fetch(`https://c.y.qq.com/qzone/fcg-bin/fcg_ucc_getcdinfo_byids_cp.fcg?${params.toString()}`, {
-    headers: qqMusicHeaders(),
-  });
+  const data = await fetchJsonWithTimeout(
+    `https://c.y.qq.com/qzone/fcg-bin/fcg_ucc_getcdinfo_byids_cp.fcg?${params.toString()}`,
+    { headers: qqMusicHeaders() },
+    FETCH_TIMEOUT_MS,
+  );
 
-  if (!response.ok) {
-    throw new Error(`QQ 音乐歌单请求失败：${response.status}`);
-  }
-
-  const data = await response.json();
   const playlist = data?.cdlist?.[0];
 
   if (!playlist || !Array.isArray(playlist.songlist)) {
@@ -207,7 +256,7 @@ async function fetchQqPlaylistFromUrl(url: string) {
 }
 
 function extractQqPlaylistId(url: string) {
-  const text = String(url || "").trim();
+  const text = url.trim();
 
   const query = text.match(/[?&](?:id|disstid)=([0-9]+)/);
   if (query) return query[1];
@@ -262,28 +311,26 @@ async function fetchNetEasePlaylistFromUrl(url: string) {
 }
 
 function extractNetEasePlaylistId(url: string) {
-  const text = String(url || "").trim();
+  const text = url.trim();
 
   const direct = text.match(/(?:playlist\?id=|[?&]id=)([0-9]+)/);
   if (direct) return direct[1];
 
-  const numericPath = text.match(/\/playlist\/([0-9]+)/);
-  if (numericPath) return numericPath[1];
+  const path = text.match(/\/playlist\/([0-9]+)/);
+  if (path) return path[1];
 
   const numeric = text.match(/^[0-9]+$/);
   return numeric ? numeric[0] : "";
 }
 
 async function fetchNetEasePlaylist(id: string) {
-  const response = await fetch(`https://music.163.com/api/v6/playlist/detail?id=${encodeURIComponent(id)}`, {
-    headers: netEaseHeaders(),
-  });
+  const text = await fetchTextWithTimeout(
+    `https://music.163.com/api/v6/playlist/detail?id=${encodeURIComponent(id)}`,
+    { headers: netEaseHeaders() },
+    FETCH_TIMEOUT_MS,
+  );
 
-  if (!response.ok) {
-    throw new Error(`网易云歌单请求失败：${response.status}`);
-  }
-
-  const data = parseNetEaseJson(await response.text());
+  const data = parseNetEaseJson(text);
 
   if (!data || data.code !== 200 || !data.playlist) {
     throw new Error(`网易云歌单返回异常：${JSON.stringify(data).slice(0, 180)}`);
@@ -293,20 +340,18 @@ async function fetchNetEasePlaylist(id: string) {
 }
 
 async function fetchNetEaseSongDetails(ids: any[]) {
-  const response = await fetch(`https://music.163.com/api/song/detail?ids=[${ids.join(",")}]`, {
-    headers: netEaseHeaders(),
-  });
+  const text = await fetchTextWithTimeout(
+    `https://music.163.com/api/song/detail?ids=[${ids.join(",")}]`,
+    { headers: netEaseHeaders() },
+    FETCH_TIMEOUT_MS,
+  );
 
-  if (!response.ok) {
-    throw new Error(`网易云歌曲详情请求失败：${response.status}`);
-  }
-
-  const data = parseNetEaseJson(await response.text());
+  const data = parseNetEaseJson(text);
   return Array.isArray(data.songs) ? data.songs : [];
 }
 
 function parseNetEaseJson(text: string) {
-  const protectedText = String(text).replace(
+  const protectedText = text.replace(
     /("(?:id|pic|picId|picid|albumId|copyrightId|commentThreadId|trackNumberUpdateTime|subscribedCount|playCount|shareCount|commentCount)"\s*:\s*)(-?\d{16,})/g,
     '$1"$2"',
   );
@@ -419,122 +464,106 @@ function isLikelyNumericId(value: any) {
   return /^[0-9]+$/.test(String(value));
 }
 
-async function findBestPlayableMatch(track: any, sourceMode: Exclude<SourceMode, "auto">, count: number) {
-  const sources = getSearchSources(sourceMode);
-  const keywords = buildSearchKeywords(track);
-  const tried: any[] = [];
-  let best: { song: any; source: string; score: number } | null = null;
-
-  for (const source of sources) {
-    for (const keyword of keywords) {
-      if (!keyword) continue;
-
-      try {
-        const results = await searchMusic(keyword, source, count);
-        const candidate = pickBestMatch(track, results, keyword);
-
-        tried.push({
-          source,
-          keyword,
-          resultCount: Array.isArray(results) ? results.length : 0,
-          bestScore: candidate?.score || 0,
-        });
-
-        if (candidate && (!best || candidate.score > best.score)) {
-          best = {
-            song: candidate.song,
-            source,
-            score: candidate.score,
-          };
-        }
-
-        if (best && best.score >= 75) {
-          return { song: best.song, source: best.source, tried };
-        }
-      } catch (error: any) {
-        tried.push({
-          source,
-          keyword,
-          error: error?.message || String(error),
-        });
-      }
-    }
-  }
-
-  if (best && best.score >= 45) {
-    return { song: best.song, source: best.source, tried };
-  }
-
-  return {
-    song: null,
-    source: "",
-    tried,
-    reason: tried.some((item) => item.error)
-      ? "all search attempts failed or no reliable match"
-      : "no reliable match",
-  };
-}
-
 function getSearchSources(sourceMode: Exclude<SourceMode, "auto">) {
-  if (sourceMode === "qq") return ["kuwo", "netease"];
-  if (sourceMode === "kuwo") return ["kuwo", "netease"];
-  return ["netease", "kuwo"];
+  if (sourceMode === "qq" || sourceMode === "tencent") return ["tencent", "kuwo"];
+  if (sourceMode === "kuwo") return ["kuwo"];
+  return ["netease"];
 }
 
 function buildSearchKeywords(track: any) {
   const name = firstString(track.name);
   const artist = firstString(track.artist?.[0]);
   const cleanName = removeBracketText(name);
-  const keywords = [
+
+  return Array.from(new Set([
     [name, artist].filter(Boolean).join(" "),
     [cleanName, artist].filter(Boolean).join(" "),
     name,
     cleanName,
-  ];
-
-  return Array.from(new Set(keywords.map((item) => item.trim()).filter(Boolean)));
+  ].map((item) => item.trim()).filter(Boolean)));
 }
 
 async function searchMusic(keyword: string, source: string, count: number) {
-  let lastError: any = null;
+  const callback = yieldCallback();
+  const payload = new URLSearchParams({
+    types: "search",
+    count: String(count),
+    pages: "1",
+    name: keyword,
+    source,
+    s: yieldSignature(keyword),
+  });
 
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
-    try {
-      const signature = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
-      const params = new URLSearchParams({
-        types: "search",
-        source,
-        name: keyword,
-        count: String(count),
-        pages: "1",
-        s: signature,
-      });
+  const text = await fetchTextWithTimeout(
+    `${API_BASE_URL}?callback=${encodeURIComponent(callback)}`,
+    {
+      method: "POST",
+      headers: {
+        "Accept": "*/*",
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "User-Agent": "Mozilla/5.0",
+      },
+      body: payload.toString(),
+    },
+    FETCH_TIMEOUT_MS,
+  );
 
-      const response = await fetch(`${API_BASE_URL}?${params.toString()}`, {
-        headers: { Accept: "application/json" },
-      });
-
-      if (!response.ok) {
-        throw new Error(`搜索失败：${keyword}，HTTP ${response.status}`);
-      }
-
-      const data = await response.json();
-      await delay(120);
-
-      return Array.isArray(data) ? data : [];
-    } catch (error) {
-      lastError = error;
-      if (attempt < 3) {
-        await delay(450 * attempt);
-      }
-    }
-  }
-
-  throw lastError || new Error(`搜索失败：${keyword}`);
+  const data = parseJsonp(text);
+  return Array.isArray(data) ? data : [];
 }
 
-function delay(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function yieldCallback() {
+  const digits = Array.from({ length: 21 }, () => Math.floor(Math.random() * 10)).join("");
+  return `jQuery${digits}_${Date.now()}`;
+}
+
+function yieldSignature(idValue: string) {
+  const ts9 = String(Date.now()).slice(0, 9);
+  const versionPadded = GD_VERSION.split(".").map((part) => part.length === 1 ? `0${part}` : part).join("");
+  const src = `${GD_SIGNATURE_HOST}|${versionPadded}|${ts9}|${encodeURIComponent(String(idValue))}`;
+  return md5(src).slice(-8).toUpperCase();
+}
+
+function parseJsonp(text: string) {
+  const raw = text.trim();
+
+  if (raw.startsWith("[") || raw.startsWith("{")) {
+    return JSON.parse(raw);
+  }
+
+  const start = raw.indexOf("(");
+  const end = raw.lastIndexOf(")");
+
+  if (start === -1 || end === -1 || end <= start) {
+    throw new Error(`API 返回不是 JSONP：${raw.slice(0, 120)}`);
+  }
+
+  return JSON.parse(raw.slice(start + 1, end));
+}
+
+async function fetchJsonWithTimeout(url: string, init: RequestInit = {}, ms = FETCH_TIMEOUT_MS) {
+  const text = await fetchTextWithTimeout(url, init, ms);
+  return JSON.parse(text);
+}
+
+async function fetchTextWithTimeout(url: string, init: RequestInit = {}, ms = FETCH_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort("timeout"), ms);
+
+  try {
+    const response = await fetch(url, {
+      ...init,
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    return await response.text();
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function pickBestMatch(track: any, results: any[], keyword = "") {
@@ -551,8 +580,7 @@ function scoreMatch(track: any, song: any, keyword = "") {
   const wantedNameClean = normalizeText(removeBracketText(track.name));
   const foundName = normalizeText(song.name);
 
-  if (!wantedName && !wantedNameClean) return 0;
-  if (!foundName) return 0;
+  if (!foundName || (!wantedName && !wantedNameClean)) return 0;
 
   let score = 0;
 
@@ -575,8 +603,6 @@ function scoreMatch(track: any, song: any, keyword = "") {
     score += 8;
   } else if (wantedArtists.some((wanted: string) => foundArtists.some((found: string) => wanted === found || wanted.includes(found) || found.includes(wanted)))) {
     score += 30;
-  } else if (wantedArtists.some((wanted: string) => foundArtists.some((found: string) => overlapText(wanted, found)))) {
-    score += 12;
   }
 
   const wantedAlbum = normalizeText(track.album);
@@ -587,11 +613,6 @@ function scoreMatch(track: any, song: any, keyword = "") {
   }
 
   return score;
-}
-
-function overlapText(a: string, b: string) {
-  if (!a || !b) return false;
-  return a.length >= 2 && b.length >= 2 && (a.includes(b.slice(0, 2)) || b.includes(a.slice(0, 2)));
 }
 
 function removeBracketText(value: any) {
@@ -637,4 +658,180 @@ function timestamp() {
 function clampInteger(value: number, min: number, max: number, fallback: number) {
   if (!Number.isInteger(value)) return fallback;
   return Math.min(Math.max(value, min), max);
+}
+
+/* Minimal MD5 implementation for GDStudio s parameter */
+function md5(input: string) {
+  function rotateLeft(value: number, shift: number) {
+    return (value << shift) | (value >>> (32 - shift));
+  }
+
+  function addUnsigned(x: number, y: number) {
+    const x4 = x & 0x40000000;
+    const y4 = y & 0x40000000;
+    const x8 = x & 0x80000000;
+    const y8 = y & 0x80000000;
+    const result = (x & 0x3fffffff) + (y & 0x3fffffff);
+
+    if (x4 & y4) return result ^ 0x80000000 ^ x8 ^ y8;
+    if (x4 | y4) {
+      if (result & 0x40000000) return result ^ 0xc0000000 ^ x8 ^ y8;
+      return result ^ 0x40000000 ^ x8 ^ y8;
+    }
+
+    return result ^ x8 ^ y8;
+  }
+
+  function f(x: number, y: number, z: number) { return (x & y) | (~x & z); }
+  function g(x: number, y: number, z: number) { return (x & z) | (y & ~z); }
+  function h(x: number, y: number, z: number) { return x ^ y ^ z; }
+  function i(x: number, y: number, z: number) { return y ^ (x | ~z); }
+
+  function ff(a: number, b: number, c: number, d: number, x: number, s: number, ac: number) {
+    a = addUnsigned(a, addUnsigned(addUnsigned(f(b, c, d), x), ac));
+    return addUnsigned(rotateLeft(a, s), b);
+  }
+
+  function gg(a: number, b: number, c: number, d: number, x: number, s: number, ac: number) {
+    a = addUnsigned(a, addUnsigned(addUnsigned(g(b, c, d), x), ac));
+    return addUnsigned(rotateLeft(a, s), b);
+  }
+
+  function hh(a: number, b: number, c: number, d: number, x: number, s: number, ac: number) {
+    a = addUnsigned(a, addUnsigned(addUnsigned(h(b, c, d), x), ac));
+    return addUnsigned(rotateLeft(a, s), b);
+  }
+
+  function ii(a: number, b: number, c: number, d: number, x: number, s: number, ac: number) {
+    a = addUnsigned(a, addUnsigned(addUnsigned(i(b, c, d), x), ac));
+    return addUnsigned(rotateLeft(a, s), b);
+  }
+
+  function convertToWordArray(str: string) {
+    const wordArray: number[] = [];
+    const utf8 = unescape(encodeURIComponent(str));
+    const messageLength = utf8.length;
+    const numberOfWordsTemp1 = messageLength + 8;
+    const numberOfWordsTemp2 = (numberOfWordsTemp1 - (numberOfWordsTemp1 % 64)) / 64;
+    const numberOfWords = (numberOfWordsTemp2 + 1) * 16;
+
+    for (let i = 0; i < numberOfWords; i += 1) wordArray[i] = 0;
+
+    let bytePosition = 0;
+    let byteCount = 0;
+
+    while (byteCount < messageLength) {
+      const wordCount = (byteCount - (byteCount % 4)) / 4;
+      bytePosition = (byteCount % 4) * 8;
+      wordArray[wordCount] = wordArray[wordCount] | (utf8.charCodeAt(byteCount) << bytePosition);
+      byteCount += 1;
+    }
+
+    const wordCount = (byteCount - (byteCount % 4)) / 4;
+    bytePosition = (byteCount % 4) * 8;
+    wordArray[wordCount] = wordArray[wordCount] | (0x80 << bytePosition);
+    wordArray[numberOfWords - 2] = messageLength << 3;
+    wordArray[numberOfWords - 1] = messageLength >>> 29;
+
+    return wordArray;
+  }
+
+  function wordToHex(value: number) {
+    let output = "";
+
+    for (let count = 0; count <= 3; count += 1) {
+      const byte = (value >>> (count * 8)) & 255;
+      output += `0${byte.toString(16)}`.slice(-2);
+    }
+
+    return output;
+  }
+
+  const x = convertToWordArray(input);
+  let a = 0x67452301;
+  let b = 0xefcdab89;
+  let c = 0x98badcfe;
+  let d = 0x10325476;
+
+  for (let k = 0; k < x.length; k += 16) {
+    const aa = a;
+    const bb = b;
+    const cc = c;
+    const dd = d;
+
+    a = ff(a, b, c, d, x[k + 0], 7, 0xd76aa478);
+    d = ff(d, a, b, c, x[k + 1], 12, 0xe8c7b756);
+    c = ff(c, d, a, b, x[k + 2], 17, 0x242070db);
+    b = ff(b, c, d, a, x[k + 3], 22, 0xc1bdceee);
+    a = ff(a, b, c, d, x[k + 4], 7, 0xf57c0faf);
+    d = ff(d, a, b, c, x[k + 5], 12, 0x4787c62a);
+    c = ff(c, d, a, b, x[k + 6], 17, 0xa8304613);
+    b = ff(b, c, d, a, x[k + 7], 22, 0xfd469501);
+    a = ff(a, b, c, d, x[k + 8], 7, 0x698098d8);
+    d = ff(d, a, b, c, x[k + 9], 12, 0x8b44f7af);
+    c = ff(c, d, a, b, x[k + 10], 17, 0xffff5bb1);
+    b = ff(b, c, d, a, x[k + 11], 22, 0x895cd7be);
+    a = ff(a, b, c, d, x[k + 12], 7, 0x6b901122);
+    d = ff(d, a, b, c, x[k + 13], 12, 0xfd987193);
+    c = ff(c, d, a, b, x[k + 14], 17, 0xa679438e);
+    b = ff(b, c, d, a, x[k + 15], 22, 0x49b40821);
+
+    a = gg(a, b, c, d, x[k + 1], 5, 0xf61e2562);
+    d = gg(d, a, b, c, x[k + 6], 9, 0xc040b340);
+    c = gg(c, d, a, b, x[k + 11], 14, 0x265e5a51);
+    b = gg(b, c, d, a, x[k + 0], 20, 0xe9b6c7aa);
+    a = gg(a, b, c, d, x[k + 5], 5, 0xd62f105d);
+    d = gg(d, a, b, c, x[k + 10], 9, 0x02441453);
+    c = gg(c, d, a, b, x[k + 15], 14, 0xd8a1e681);
+    b = gg(b, c, d, a, x[k + 4], 20, 0xe7d3fbc8);
+    a = gg(a, b, c, d, x[k + 9], 5, 0x21e1cde6);
+    d = gg(d, a, b, c, x[k + 14], 9, 0xc33707d6);
+    c = gg(c, d, a, b, x[k + 3], 14, 0xf4d50d87);
+    b = gg(b, c, d, a, x[k + 8], 20, 0x455a14ed);
+    a = gg(a, b, c, d, x[k + 13], 5, 0xa9e3e905);
+    d = gg(d, a, b, c, x[k + 2], 9, 0xfcefa3f8);
+    c = gg(c, d, a, b, x[k + 7], 14, 0x676f02d9);
+    b = gg(b, c, d, a, x[k + 12], 20, 0x8d2a4c8a);
+
+    a = hh(a, b, c, d, x[k + 5], 4, 0xfffa3942);
+    d = hh(d, a, b, c, x[k + 8], 11, 0x8771f681);
+    c = hh(c, d, a, b, x[k + 11], 16, 0x6d9d6122);
+    b = hh(b, c, d, a, x[k + 14], 23, 0xfde5380c);
+    a = hh(a, b, c, d, x[k + 1], 4, 0xa4beea44);
+    d = hh(d, a, b, c, x[k + 4], 11, 0x4bdecfa9);
+    c = hh(c, d, a, b, x[k + 7], 16, 0xf6bb4b60);
+    b = hh(b, c, d, a, x[k + 10], 23, 0xbebfbc70);
+    a = hh(a, b, c, d, x[k + 13], 4, 0x289b7ec6);
+    d = hh(d, a, b, c, x[k + 0], 11, 0xeaa127fa);
+    c = hh(c, d, a, b, x[k + 3], 16, 0xd4ef3085);
+    b = hh(b, c, d, a, x[k + 6], 23, 0x04881d05);
+    a = hh(a, b, c, d, x[k + 9], 4, 0xd9d4d039);
+    d = hh(d, a, b, c, x[k + 12], 11, 0xe6db99e5);
+    c = hh(c, d, a, b, x[k + 15], 16, 0x1fa27cf8);
+    b = hh(b, c, d, a, x[k + 2], 23, 0xc4ac5665);
+
+    a = ii(a, b, c, d, x[k + 0], 6, 0xf4292244);
+    d = ii(d, a, b, c, x[k + 7], 10, 0x432aff97);
+    c = ii(c, d, a, b, x[k + 14], 15, 0xab9423a7);
+    b = ii(b, c, d, a, x[k + 5], 21, 0xfc93a039);
+    a = ii(a, b, c, d, x[k + 12], 6, 0x655b59c3);
+    d = ii(d, a, b, c, x[k + 3], 10, 0x8f0ccc92);
+    c = ii(c, d, a, b, x[k + 10], 15, 0xffeff47d);
+    b = ii(b, c, d, a, x[k + 1], 21, 0x85845dd1);
+    a = ii(a, b, c, d, x[k + 8], 6, 0x6fa87e4f);
+    d = ii(d, a, b, c, x[k + 15], 10, 0xfe2ce6e0);
+    c = ii(c, d, a, b, x[k + 6], 15, 0xa3014314);
+    b = ii(b, c, d, a, x[k + 13], 21, 0x4e0811a1);
+    a = ii(a, b, c, d, x[k + 4], 6, 0xf7537e82);
+    d = ii(d, a, b, c, x[k + 11], 10, 0xbd3af235);
+    c = ii(c, d, a, b, x[k + 2], 15, 0x2ad7d2bb);
+    b = ii(b, c, d, a, x[k + 9], 21, 0xeb86d391);
+
+    a = addUnsigned(a, aa);
+    b = addUnsigned(b, bb);
+    c = addUnsigned(c, cc);
+    d = addUnsigned(d, dd);
+  }
+
+  return (wordToHex(a) + wordToHex(b) + wordToHex(c) + wordToHex(d)).toLowerCase();
 }
