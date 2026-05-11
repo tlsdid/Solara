@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Solara 歌单转换器</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #f5f5f2;
+      color: #191919;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      box-sizing: border-box;
+    }
+
+    .card {
+      width: min(100%, 520px);
+      background: rgba(255,255,255,.86);
+      border: 1px solid rgba(0,0,0,.08);
+      border-radius: 24px;
+      box-shadow: 0 18px 50px rgba(0,0,0,.08);
+      padding: 22px;
+      box-sizing: border-box;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 24px;
+      letter-spacing: -0.02em;
+    }
+
+    p {
+      margin: 0 0 18px;
+      font-size: 14px;
+      color: #666;
+      line-height: 1.6;
+    }
+
+    label {
+      display: block;
+      margin: 14px 0 6px;
+      font-size: 13px;
+      color: #555;
+    }
+
+    input,
+    select,
+    button {
+      width: 100%;
+      box-sizing: border-box;
+      border-radius: 14px;
+      border: 1px solid rgba(0,0,0,.12);
+      font: inherit;
+    }
+
+    input,
+    select {
+      padding: 12px 13px;
+      background: rgba(255,255,255,.92);
+      color: #111;
+      outline: none;
+    }
+
+    button {
+      margin-top: 16px;
+      padding: 13px 14px;
+      border: 0;
+      background: #191919;
+      color: #fff;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: .55;
+      cursor: not-allowed;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .downloads {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .downloads button {
+      margin-top: 0;
+      background: #fff;
+      color: #111;
+      border: 1px solid rgba(0,0,0,.12);
+    }
+
+    .status {
+      margin-top: 14px;
+      padding: 12px;
+      border-radius: 14px;
+      background: rgba(0,0,0,.04);
+      font-size: 13px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        background: #111;
+        color: #f5f5f5;
+      }
+
+      .card {
+        background: rgba(32,32,32,.9);
+        border-color: rgba(255,255,255,.1);
+      }
+
+      p,
+      label {
+        color: #b8b8b8;
+      }
+
+      input,
+      select {
+        background: rgba(255,255,255,.08);
+        border-color: rgba(255,255,255,.14);
+        color: #f5f5f5;
+      }
+
+      button {
+        background: #f5f5f5;
+        color: #111;
+      }
+
+      .downloads button {
+        background: rgba(255,255,255,.08);
+        color: #f5f5f5;
+        border-color: rgba(255,255,255,.14);
+      }
+
+      .status {
+        background: rgba(255,255,255,.08);
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>Solara 歌单转换器</h1>
+    <p>粘贴网易云或 QQ 音乐歌单链接，转换成 Solara 可导入的 JSON 文件。</p>
+
+    <label for="playlistUrl">歌单链接</label>
+    <input id="playlistUrl" type="url" placeholder="https://music.163.com/playlist?id=..." />
+
+    <div class="row">
+      <div>
+        <label for="mode">来源</label>
+        <select id="mode">
+          <option value="auto">自动识别</option>
+          <option value="netease">网易云</option>
+          <option value="qq">QQ 音乐</option>
+          <option value="kuwo">酷我搜索</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="limit">最多转换</label>
+        <select id="limit">
+          <option value="50">50 首</option>
+          <option value="120" selected>120 首</option>
+          <option value="200">200 首</option>
+          <option value="300">300 首</option>
+        </select>
+      </div>
+    </div>
+
+    <button id="convertBtn" type="button">开始转换</button>
+
+    <div class="status" id="status">等待输入。</div>
+
+    <div class="downloads">
+      <button id="downloadPlaylistBtn" type="button" disabled>下载 Solara JSON</button>
+      <button id="downloadMissingBtn" type="button" disabled>下载未匹配报告</button>
+    </div>
+  </main>
+
+  <script>
+    const playlistUrl = document.getElementById("playlistUrl");
+    const mode = document.getElementById("mode");
+    const limit = document.getElementById("limit");
+    const convertBtn = document.getElementById("convertBtn");
+    const statusBox = document.getElementById("status");
+    const downloadPlaylistBtn = document.getElementById("downloadPlaylistBtn");
+    const downloadMissingBtn = document.getElementById("downloadMissingBtn");
+
+    let latestResult = null;
+
+    convertBtn.addEventListener("click", async () => {
+      const url = playlistUrl.value.trim();
+
+      if (!url) {
+        statusBox.textContent = "请输入歌单链接。";
+        return;
+      }
+
+      latestResult = null;
+      downloadPlaylistBtn.disabled = true;
+      downloadMissingBtn.disabled = true;
+      convertBtn.disabled = true;
+      statusBox.textContent = "转换中。大歌单需要等待一段时间。";
+
+      try {
+        const response = await fetch("/api/convert-playlist", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            url,
+            mode: mode.value,
+            limit: limit.value,
+            count: 10,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+          throw new Error(data.error || "转换失败");
+        }
+
+        latestResult = data;
+
+        statusBox.textContent = [
+          "转换完成。",
+          `来源：${data.summary.sourceMode}`,
+          `识别歌曲：${data.summary.total}`,
+          `成功转换：${data.summary.converted}`,
+          `未匹配：${data.summary.missing}`,
+        ].join("\n");
+
+        downloadPlaylistBtn.disabled = false;
+        downloadMissingBtn.disabled = false;
+      } catch (error) {
+        statusBox.textContent = `转换失败：${error.message || error}`;
+      } finally {
+        convertBtn.disabled = false;
+      }
+    });
+
+    downloadPlaylistBtn.addEventListener("click", () => {
+      if (!latestResult) return;
+      downloadJson(latestResult.payload, latestResult.filenames.playlist || "solara-playlist.json");
+    });
+
+    downloadMissingBtn.addEventListener("click", () => {
+      if (!latestResult) return;
+      downloadJson(latestResult.missing, latestResult.filenames.missing || "solara-playlist-not-found.json");
+    });
+
+    function downloadJson(data, filename) {
+      const blob = new Blob([JSON.stringify(data, null, 2) + "\n"], {
+        type: "application/json;charset=utf-8",
+      });
+
+      const href = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = href;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(href);
+    }
+  </script>
+</body>
+</html>
