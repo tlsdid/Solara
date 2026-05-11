@@ -5652,7 +5652,10 @@ function toggleFavorite(song) {
         removeFavoriteAtIndex(existingIndex);
         showNotification("已从收藏列表移除", "success");
     } else {
-        favorites.push(normalizedSong);
+        favorites.unshift(normalizedSong);
+        if (state.currentList === "favorite") {
+            state.currentFavoriteIndex++;
+        }
         saveFavoriteState();
         renderFavorites();
         showNotification("已添加到收藏列表", "success");
@@ -5839,6 +5842,7 @@ function handleImportedFavoriteItems(rawItems) {
 
     let added = 0;
     let duplicates = 0;
+    const importedFavorites = [];
 
     sanitizedSongs.forEach((song) => {
         const key = getSongKey(song);
@@ -5846,7 +5850,7 @@ function handleImportedFavoriteItems(rawItems) {
             duplicates++;
             return;
         }
-        favorites.push(song);
+        importedFavorites.push(song);
         if (key) {
             existingKeys.add(key);
         }
@@ -5854,6 +5858,10 @@ function handleImportedFavoriteItems(rawItems) {
     });
 
     if (added > 0) {
+        favorites.unshift(...importedFavorites);
+        if (state.currentList === "favorite") {
+            state.currentFavoriteIndex += added;
+        }
         saveFavoriteState();
         renderFavorites();
     } else {
