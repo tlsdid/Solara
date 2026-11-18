@@ -871,9 +871,10 @@ const API = {
         return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
     },
 
-    fetchJson: async (url) => {
+    fetchJson: async (url, { signal } = {}) => {
         try {
             const response = await fetch(url, {
+                signal,
                 headers: {
                     "Accept": "application/json",
                 },
@@ -896,7 +897,7 @@ const API = {
                 return text;
             }
         } catch (error) {
-            console.error("API request error:", error);
+            if (!signal?.aborted) console.error("API request error:", error);
             throw error;
         }
     },
@@ -3807,81 +3808,120 @@ function setupInteractions() {
     }
 }
 
-// 修复：更新当前歌曲信息和封面
-function updateCurrentSongInfo(song, options = {}) {
-    const { loadArtwork = true } = options;
+let songAssets = null;
+
+function stopSongAssets() {
+    songAssets?.controller.abort();
+    songAssets = null;
+}
+
+function waitForSongAssetRetry(delay, signal) {
+    if (signal.aborted) return Promise.resolve();
+    return new Promise(resolve => {
+        const finish = () => {
+            window.clearTimeout(timer);
+            signal.removeEventListener("abort", finish);
+            resolve();
+        };
+        const timer = window.setTimeout(finish, delay);
+        signal.addEventListener("abort", finish, { once: true });
+    });
+}
+
+async function retrySongAsset(song, controller, load, onRetry) {
+    const signal = controller.signal;
+    const isCurrent = () => !signal.aborted && state.currentSong === song;
+    let delay = 1000;
+    while (isCurrent()) {
+        const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(12000)]);
+        try {
+            await load(requestSignal, isCurrent);
+            return;
+        } catch (error) {
+            if (!isCurrent()) return;
+            debugLog(`歌曲资料加载失败，${delay / 1000} 秒后重试: ${error.message}`);
+            onRetry?.();
+            await waitForSongAssetRetry(delay, signal);
+            delay = Math.min(delay * 2, 30000);
+        }
+    }
+}
+
+function loadCoverImage(url, signal) {
+    return new Promise((resolve, reject) => {
+        const image = new Image();
+        const finish = (error) => {
+            signal.removeEventListener("abort", onAbort);
+            image.onload = null;
+            image.onerror = null;
+            if (error) reject(error);
+            else resolve();
+        };
+        const onAbort = () => {
+            finish(signal.reason);
+            image.removeAttribute("src");
+        };
+        if (signal.aborted) {
+            onAbort();
+            return;
+        }
+        signal.addEventListener("abort", onAbort, { once: true });
+        image.crossOrigin = "anonymous";
+        image.onload = () => finish();
+        image.onerror = () => finish(new Error("封面图片加载失败"));
+        image.src = url;
+    });
+}
+
+async function updateCurrentSongInfo(song) {
     state.currentSong = song;
     dom.currentSongTitle.textContent = song.name;
     updateMobileToolbarTitle();
     updateFavoriteIcons();
-
-    // 修复艺人名称显示问题 - 使用正确的字段名
-    const artistText = Array.isArray(song.artist) ? song.artist.join(', ') : (song.artist || '未知艺术家');
+    const artistText = Array.isArray(song.artist) ? song.artist.join(", ") : song.artist || "未知艺术家";
     dom.currentSongArtist.textContent = artistText;
 
+    if (songAssets?.song === song) return;
+    stopSongAssets();
+    const controller = new AbortController();
+    songAssets = { song, controller };
+
     cancelDeferredPaletteUpdate();
+    state.currentArtworkUrl = null;
+    showAlbumCoverPlaceholder();
 
-    if (!loadArtwork) {
-        dom.albumCover.classList.add("loading");
-        dom.albumCover.innerHTML = PLACEHOLDER_HTML;
-        state.currentArtworkUrl = null;
-        return Promise.resolve();
-    }
+    state.lyricsData = [];
+    state.currentLyricLine = -1;
+    dom.lyrics.classList.add("empty");
+    dom.lyrics.dataset.placeholder = "message";
+    setLyricsContentHtml("<div>正在加载歌词…</div>");
 
-    // 加载封面
     if (song.pic_id) {
-        cancelDeferredPaletteUpdate();
-        dom.albumCover.classList.add("loading");
-        const picUrl = API.getPicUrl(song);
-
-        API.fetchJson(picUrl)
-            .then(data => {
-                if (!data || !data.url) {
-                    throw new Error("封面地址缺失");
-                }
-
-                const img = new Image();
-                const imageUrl = preferHttpsUrl(data.url);
-                const absoluteImageUrl = toAbsoluteUrl(imageUrl);
-                if (state.currentSong === song) {
-                    state.currentArtworkUrl = absoluteImageUrl;
-                    if (typeof window.__SOLARA_UPDATE_MEDIA_METADATA === 'function') {
-                        window.__SOLARA_UPDATE_MEDIA_METADATA();
-                    }
-                }
-                img.crossOrigin = "anonymous";
-                img.onload = () => {
-                    if (state.currentSong !== song) {
-                        return;
-                    }
-                    setAlbumCoverImage(imageUrl);
-                    const paletteUrl = preferHttpsUrl(data.paletteUrl || imageUrl);
-                    const shouldApplyImmediately = paletteCache.has(paletteUrl) ||
-                        (state.currentPaletteImage === paletteUrl && state.dynamicPalette);
-                    scheduleDeferredPaletteUpdate(paletteUrl, { immediate: shouldApplyImmediately });
-                };
-                img.onerror = () => {
-                    if (state.currentSong !== song) {
-                        return;
-                    }
-                    cancelDeferredPaletteUpdate();
-                    showAlbumCoverPlaceholder();
-                };
-                img.src = imageUrl;
-            })
-            .catch(error => {
-                console.error("加载封面失败:", error);
-                if (state.currentSong === song) {
-                    cancelDeferredPaletteUpdate();
-                    showAlbumCoverPlaceholder();
-                }
-            });
-    } else {
-        cancelDeferredPaletteUpdate();
-        showAlbumCoverPlaceholder();
+        void retrySongAsset(song, controller, async (signal, isCurrent) => {
+            const data = await API.fetchJson(API.getPicUrl(song), { signal });
+            if (!data?.url) throw new Error("封面地址缺失");
+            const imageUrl = preferHttpsUrl(data.url);
+            await loadCoverImage(imageUrl, signal);
+            if (!isCurrent()) return;
+            setAlbumCoverImage(imageUrl);
+            const paletteUrl = preferHttpsUrl(data.paletteUrl || imageUrl);
+            const shouldApplyImmediately = paletteCache.has(paletteUrl) ||
+                (state.currentPaletteImage === paletteUrl && state.dynamicPalette);
+            scheduleDeferredPaletteUpdate(paletteUrl, { immediate: shouldApplyImmediately });
+        });
     }
 
-    return Promise.resolve();
+    void retrySongAsset(song, controller, async (signal, isCurrent) => {
+        const data = await API.fetchJson(API.getLyric(song), { signal });
+        if (typeof data?.lyric !== "string" || !data.lyric.trim()) {
+            throw new Error("歌词暂不可用");
+        }
+        if (!isCurrent()) return;
+        if (!parseLyrics(data.lyric)) throw new Error("歌词没有有效的时间戳");
+        dom.lyrics.classList.remove("empty");
+        dom.lyrics.dataset.placeholder = "default";
+        syncLyrics();
+    }, () => setLyricsContentHtml("<div>歌词暂不可用，正在重试…</div>"));
 }
 
 // 搜索功能 - 修复搜索下拉框显示问题
@@ -5741,6 +5781,7 @@ function removeFromPlaylist(index) {
             dom.audioPlayer.pause();
             dom.audioPlayer.src = "";
             state.currentTrackIndex = -1;
+            stopSongAssets();
             state.currentSong = null;
             state.currentAudioUrl = null;
             state.currentPlaybackTime = 0;
@@ -6256,6 +6297,7 @@ function clearPlaylist() {
         dom.audioPlayer.pause();
         dom.audioPlayer.src = "";
         state.currentTrackIndex = -1;
+        stopSongAssets();
         state.currentSong = null;
         state.currentAudioUrl = null;
         state.currentPlaybackTime = 0;
@@ -6350,24 +6392,31 @@ function waitForAudioReady(player) {
     });
 }
 
+let activePlaybackRequest = 0;
+
 async function playSong(song, options = {}) {
+    const requestId = ++activePlaybackRequest;
+    const isCurrent = () => activePlaybackRequest === requestId && state.currentSong === song;
     const { autoplay = true, startTime = 0, preserveProgress = false } = options;
 
-    window.clearTimeout(pendingPaletteTimer);
-    state.audioReadyForPalette = false;
-    state.pendingPaletteData = null;
-    state.pendingPaletteImage = null;
-    state.pendingPaletteImmediate = false;
-    state.pendingPaletteReady = false;
+    if (songAssets?.song !== song) {
+        window.clearTimeout(pendingPaletteTimer);
+        state.audioReadyForPalette = false;
+        state.pendingPaletteData = null;
+        state.pendingPaletteImage = null;
+        state.pendingPaletteImmediate = false;
+        state.pendingPaletteReady = false;
+    }
 
     try {
-        updateCurrentSongInfo(song, { loadArtwork: false });
+        updateCurrentSongInfo(song);
 
         const quality = state.playbackQuality || '320';
         const audioUrl = API.getSongUrl(song, quality);
         debugLog(`获取音频URL: ${audioUrl}`);
 
         const audioData = await API.fetchJson(audioUrl);
+        if (!isCurrent()) return;
 
         if (!audioData || !audioData.url) {
             throw new Error('无法获取音频播放地址');
@@ -6422,10 +6471,12 @@ async function playSong(song, options = {}) {
 
             try {
                 await waitForAudioReady(dom.audioPlayer);
+                if (!isCurrent()) return;
                 selectedAudioUrl = candidateUrl;
                 usedFallbackAudio = candidateUrl !== primaryAudioUrl && candidateAudioUrls.length > 1;
                 break;
             } catch (error) {
+                if (!isCurrent()) return;
                 lastAudioError = error;
                 console.warn('音频元数据加载异常', error);
 
@@ -6457,24 +6508,23 @@ async function playSong(song, options = {}) {
 
         state.lastSavedPlaybackTime = state.currentPlaybackTime;
 
-        let playPromise = null;
-
         if (autoplay) {
-            playPromise = dom.audioPlayer.play();
+            const playPromise = dom.audioPlayer.play();
             if (playPromise !== undefined) {
                 playPromise.catch(error => {
                     console.error('播放失败:', error);
                     showNotification('播放失败，请检查网络连接', 'error');
                 });
-            } else {
-                playPromise = null;
             }
         } else {
             dom.audioPlayer.pause();
             updatePlayPauseButton();
         }
 
-        scheduleDeferredSongAssets(song, playPromise);
+        if (state.currentSong === song) {
+            state.audioReadyForPalette = true;
+            attemptPaletteApplication();
+        }
 
         debugLog(`开始播放: ${song.name} @${quality}`);
 
@@ -6482,56 +6532,11 @@ async function playSong(song, options = {}) {
             window.__SOLARA_UPDATE_MEDIA_METADATA();
         }
     } catch (error) {
+        if (!isCurrent()) return;
         console.error('播放歌曲失败:', error);
         throw error;
     } finally {
         savePlayerState();
-    }
-}
-
-function scheduleDeferredSongAssets(song, playPromise) {
-    const run = () => {
-        if (state.currentSong !== song) {
-            return;
-        }
-
-        updateCurrentSongInfo(song, { loadArtwork: true });
-        loadLyrics(song);
-        state.audioReadyForPalette = true;
-        attemptPaletteApplication();
-    };
-
-    const kickoff = () => {
-        if (state.currentSong !== song) {
-            return;
-        }
-
-        if (typeof window.requestAnimationFrame === "function") {
-            window.requestAnimationFrame(() => {
-                if (state.currentSong !== song) {
-                    return;
-                }
-
-                if (typeof window.requestIdleCallback === "function") {
-                    window.requestIdleCallback(() => {
-                        if (state.currentSong !== song) {
-                            return;
-                        }
-                        run();
-                    }, { timeout: 600 });
-                } else {
-                    run();
-                }
-            });
-        } else {
-            window.setTimeout(run, 0);
-        }
-    };
-
-    if (playPromise && typeof playPromise.finally === "function") {
-        playPromise.finally(kickoff);
-    } else {
-        kickoff();
     }
 }
 
@@ -6887,49 +6892,17 @@ async function exploreOnlineMusic() {
     }
 }
 
-// 修复：加载歌词
-async function loadLyrics(song) {
-    try {
-        const lyricUrl = API.getLyric(song);
-        debugLog(`获取歌词URL: ${lyricUrl}`);
-
-        const lyricData = await API.fetchJson(lyricUrl);
-
-        if (lyricData && lyricData.lyric) {
-            parseLyrics(lyricData.lyric);
-            dom.lyrics.classList.remove("empty");
-            dom.lyrics.dataset.placeholder = "default";
-            debugLog(`歌词加载成功: ${state.lyricsData.length} 行`);
-        } else {
-            setLyricsContentHtml("<div>暂无歌词</div>");
-            dom.lyrics.classList.add("empty");
-            dom.lyrics.dataset.placeholder = "message";
-            state.lyricsData = [];
-            state.currentLyricLine = -1;
-            debugLog("歌词加载失败: 无歌词数据");
-        }
-    } catch (error) {
-        console.error("加载歌词失败:", error);
-        setLyricsContentHtml("<div>歌词加载失败</div>");
-        dom.lyrics.classList.add("empty");
-        dom.lyrics.dataset.placeholder = "message";
-        state.lyricsData = [];
-        state.currentLyricLine = -1;
-        debugLog(`歌词加载失败: ${error}`);
-    }
-}
-
 // 修复：解析歌词
 function parseLyrics(lyricText) {
     const lines = lyricText.split('\n');
     const lyrics = [];
 
     lines.forEach(line => {
-        const match = line.match(/\[(\d{2}):(\d{2})\.(\d{2,3})\](.*)/);
+        const match = line.match(/\[(\d+):(\d{2})(?:[.:](\d{1,3}))?\](.*)/);
         if (match) {
             const minutes = parseInt(match[1]);
             const seconds = parseInt(match[2]);
-            const milliseconds = parseInt(match[3].padEnd(3, '0'));
+            const milliseconds = parseInt((match[3] || '').padEnd(3, '0'));
             const time = minutes * 60 + seconds + milliseconds / 1000;
             const text = match[4].trim();
 
@@ -6939,9 +6912,12 @@ function parseLyrics(lyricText) {
         }
     });
 
+    if (lyrics.length === 0) return false;
+    state.currentLyricLine = -1;
     state.lyricsData = lyrics.sort((a, b) => a.time - b.time);
     displayLyrics();
     debugLog(`解析歌词完成: ${state.lyricsData.length} 行`);
+    return true;
 }
 
 function setLyricsContentHtml(html) {
