@@ -98,7 +98,7 @@ export async function handleQqMusic(params: URLSearchParams): Promise<Response> 
       }
 
       const image = await fetch(cover, {
-        redirect: "error",
+        redirect: "manual",
         signal: AbortSignal.timeout(8000),
       });
       if (!image.ok || image.headers.get("Content-Type")?.split(";")[0] !== "image/jpeg") {
