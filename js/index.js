@@ -7085,6 +7085,18 @@ async function downloadSong(song, quality = "320") {
         showNotification("正在准备下载...");
 
         const audioUrl = API.getSongUrl(song, quality);
+        if (["tencent", "qq"].includes(song.source)) {
+            const downloadUrl = new URL(audioUrl, window.location.href);
+            downloadUrl.searchParams.set("types", "download");
+            const link = document.createElement("a");
+            link.href = downloadUrl.href;
+            link.download = "";
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            return;
+        }
+
         const audioData = await API.fetchJson(audioUrl);
 
         if (audioData && audioData.url) {
