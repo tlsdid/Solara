@@ -407,6 +407,10 @@ source: tencent
 ## 致谢
 
 - 感谢 GD 音乐台提供免费音乐聚合接口。
+- 感谢 [星海音乐源](https://github.com/pdone/lx-music-source/tree/main/xinghai) 提供 QQ 音乐主播放线路。
+- 感谢 [清凉音源](https://github.com/pdone/lx-music-source/tree/main/qingliang) 提供 QQ 音乐备用播放线路。
+- 感谢 [洛雪音乐源合集](https://github.com/pdone/lx-music-source) 的维护者整理和分享音源脚本。
+- 感谢 [QQ 音乐](https://y.qq.com/) 提供歌曲搜索、同步歌词和专辑封面。
 - 感谢 Linux.do 社区相关项目与讨论提供灵感。
 - 本项目基于原 Solara 项目继续改造。
 
