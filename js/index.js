@@ -2727,6 +2727,7 @@ function selectSearchSource(source) {
     updateSourceLabel();
     buildSourceMenu();
     closeSourceMenu();
+    if (dom.searchInput?.value.trim()) performSearch();
 }
 
 function buildQualityMenu() {
@@ -3878,6 +3879,8 @@ function updateCurrentSongInfo(song, options = {}) {
 }
 
 // 搜索功能 - 修复搜索下拉框显示问题
+let searchRequestId = 0;
+
 async function performSearch(isLiveSearch = false) {
     const query = dom.searchInput.value.trim();
     if (!query) {
@@ -3889,6 +3892,7 @@ async function performSearch(isLiveSearch = false) {
         closeSourceMenu();
     }
 
+    const requestId = ++searchRequestId;
     const source = normalizeSource(state.searchSource);
     state.searchSource = source;
     safeSetLocalStorage("searchSource", source);
@@ -3925,6 +3929,7 @@ async function performSearch(isLiveSearch = false) {
 
         // 执行搜索
         const results = await API.search(query, source, 20, state.searchPage);
+        if (requestId !== searchRequestId) return;
         debugLog(`API返回结果数量: ${results.length}`);
 
         if (state.searchPage === 1) {
@@ -3949,14 +3954,17 @@ async function performSearch(isLiveSearch = false) {
         }
 
     } catch (error) {
+        if (requestId !== searchRequestId) return;
         console.error("搜索失败:", error);
         showNotification("搜索失败，请稍后重试", "error");
         hideSearchResults();
         debugLog(`搜索失败: ${error.message}`);
     } finally {
         // 恢复搜索按钮状态
-        dom.searchBtn.disabled = false;
-        dom.searchBtn.innerHTML = '<i class="fas fa-search"></i><span>搜索</span>';
+        if (requestId === searchRequestId) {
+            dom.searchBtn.disabled = false;
+            dom.searchBtn.innerHTML = '<i class="fas fa-search"></i><span>搜索</span>';
+        }
     }
 }
 
@@ -3973,6 +3981,7 @@ async function loadMoreResults() {
         return;
     }
 
+    const requestId = searchRequestId;
     try {
         loadMoreBtn.disabled = true;
         loadMoreBtn.innerHTML = '<span class="loader"></span><span>加载中...</span>';
@@ -3984,6 +3993,7 @@ async function loadMoreResults() {
         state.searchSource = source;
         safeSetLocalStorage("searchSource", source);
         const results = await API.search(state.searchKeyword, source, 20, state.searchPage);
+        if (requestId !== searchRequestId) return;
 
         if (results.length > 0) {
             state.searchResults = [...state.searchResults, ...results];
@@ -3999,6 +4009,7 @@ async function loadMoreResults() {
             debugLog("没有更多结果");
         }
     } catch (error) {
+        if (requestId !== searchRequestId) return;
         console.error("加载更多失败:", error);
         showNotification("加载失败，请稍后重试", "error");
         state.searchPage--; // 回退页码

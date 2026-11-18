@@ -6,8 +6,8 @@ const XINGHAI_HEADERS = {
 };
 let deviceId: string | undefined;
 let session: { token: string; expires: number } | undefined;
-async function requestJson(url: string, headers: HeadersInit) {
-  const response = await fetch(url, { headers, signal: AbortSignal.timeout(8000) });
+async function requestJson(url: string, headers: HeadersInit, timeout = 8000) {
+  const response = await fetch(url, { headers, signal: AbortSignal.timeout(timeout) });
   if (!response.ok) throw new Error(`Upstream HTTP ${response.status}`);
   return response.json() as Promise<any>;
 }
@@ -25,6 +25,52 @@ async function getToken(): Promise<string> {
   return token;
 }
 
+async function searchQqMusic(keyword: string, page: number, count: number) {
+  const headers = { Referer: QQ_ORIGIN, "User-Agent": "Mozilla/5.0" };
+  const query = new URLSearchParams({
+    w: keyword, p: String(page), n: String(count), format: "json",
+    inCharset: "utf-8", outCharset: "utf-8", cr: "1",
+  });
+
+  let songs;
+  try {
+    const data = await requestJson(
+      `https://c.y.qq.com/soso/fcgi-bin/client_search_cp?${query}`, headers, 4000,
+    );
+    songs = data.data?.song?.list;
+    if (data.code !== 0 || !Array.isArray(songs)) throw new Error("QQ 音乐搜索返回异常");
+  } catch {
+    const payload = {
+      req: {
+        module: "music.search.SearchCgiService",
+        method: "DoSearchForQQMusicDesktop",
+        param: { query: keyword, search_type: 0, page_num: page, num_per_page: count },
+      },
+    };
+    const data = await requestJson(
+      `https://u.y.qq.com/cgi-bin/musicu.fcg?${new URLSearchParams({ data: JSON.stringify(payload) })}`,
+      headers, 6000,
+    );
+    songs = data.req?.data?.body?.song?.list;
+    if (!Array.isArray(songs)) throw new Error("QQ 音乐搜索暂不可用");
+  }
+
+  return songs.flatMap((song) => {
+    const id = song.songmid || song.mid;
+    const name = song.songname || song.title || song.name;
+    if (!id || !name) return [];
+    return [{
+      id, name,
+      artist: (song.singer || []).map((artist: { name: string }) => artist.name),
+      album: song.albumname || song.album?.name || "",
+      pic_id: song.albummid || song.album?.mid || "",
+      url_id: id,
+      lyric_id: id,
+      source: "tencent",
+    }];
+  });
+}
+
 export function qqAlbumCover(mid: string): string {
   return /^[A-Za-z0-9]{10,24}$/.test(mid)
     ? `https://y.gtimg.cn/music/photo_new/T002R300x300M000${mid}.jpg`
@@ -38,34 +84,9 @@ export async function handleQqMusic(params: URLSearchParams): Promise<Response> 
     if (type === "search") {
       const keyword = params.get("name")?.trim();
       if (!keyword) return Response.json([], { status: 400 });
-      const payload = {
-        req: {
-          module: "music.search.SearchCgiService",
-          method: "DoSearchForQQMusicDesktop",
-          param: {
-            query: keyword,
-            search_type: 0,
-            page_num: Math.max(1, Number.parseInt(params.get("pages") || "1", 10) || 1),
-            num_per_page: Math.min(50, Math.max(1, Number.parseInt(params.get("count") || "20", 10) || 20)),
-          },
-        },
-      };
-      const data = await requestJson(
-        `https://u.y.qq.com/cgi-bin/musicu.fcg?${new URLSearchParams({ data: JSON.stringify(payload) })}`,
-        { Referer: QQ_ORIGIN, "User-Agent": "Mozilla/5.0" },
-      );
-      const songs = data.req?.data?.body?.song?.list;
-      if (!Array.isArray(songs)) throw new Error("QQ 音乐搜索返回异常");
-      return Response.json(songs.filter((song) => song.mid).map((song) => ({
-        id: song.mid,
-        name: song.title || song.name,
-        artist: (song.singer || []).map((artist: { name: string }) => artist.name),
-        album: song.album?.name || "",
-        pic_id: song.album?.mid || "",
-        url_id: song.mid,
-        lyric_id: song.mid,
-        source: "tencent",
-      })));
+      const page = Math.max(1, Number.parseInt(params.get("pages") || "1", 10) || 1);
+      const count = Math.min(50, Math.max(1, Number.parseInt(params.get("count") || "20", 10) || 20));
+      return Response.json(await searchQqMusic(keyword, page, count));
     }
 
     if (type === "pic") return Response.json({ url: qqAlbumCover(id) });
