@@ -725,29 +725,9 @@ function toAbsoluteUrl(url) {
     }
 }
 
-function buildAudioProxyUrl(url) {
-    if (!url || typeof url !== "string") return url;
-
-    try {
-        const parsedUrl = new URL(url, window.location.href);
-        if (parsedUrl.protocol === "https:") {
-            return parsedUrl.toString();
-        }
-
-        if (parsedUrl.protocol === "http:" && /(^|\.)kuwo\.cn$/i.test(parsedUrl.hostname)) {
-            return `${API.proxyBaseUrl}?target=${encodeURIComponent(parsedUrl.toString())}`;
-        }
-
-        return parsedUrl.toString();
-    } catch (error) {
-        console.warn("无法解析音频地址，跳过代理", error);
-        return url;
-    }
-}
-
 const SOURCE_OPTIONS = [
     { value: "netease", label: "网易云音乐" },
-    { value: "kuwo", label: "酷我音乐" },
+    { value: "tencent", label: "QQ 音乐" },
     { value: "joox", label: "JOOX音乐" },
     { value: "bilibili", label: "哔哩哔哩" }
 ];
@@ -885,6 +865,8 @@ const API = {
     baseUrl: "https://music-api.gdstudio.xyz/api.php",
     proxyBaseUrl: "/proxy",
 
+    getBaseUrl: (source) => ["tencent", "qq", "kuwo"].includes(source) ? API.proxyBaseUrl : API.baseUrl,
+
     generateSignature: () => {
         return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
     },
@@ -916,7 +898,7 @@ const API = {
 
     search: async (keyword, source = "netease", count = 20, page = 1) => {
         const signature = API.generateSignature();
-        const url = `${API.baseUrl}?types=search&source=${source}&name=${encodeURIComponent(keyword)}&count=${count}&pages=${page}&s=${signature}`;
+        const url = `${API.getBaseUrl(source)}?types=search&source=${source}&name=${encodeURIComponent(keyword)}&count=${count}&pages=${page}&s=${signature}`;
 
         try {
             debugLog(`API请求: ${url}`);
@@ -996,17 +978,24 @@ const API = {
 
     getSongUrl: (song, quality = "320") => {
         const signature = API.generateSignature();
-        return `${API.baseUrl}?types=url&id=${song.id}&source=${song.source || "netease"}&br=${quality}&s=${signature}`;
+        if (["tencent", "qq"].includes(song.source)) {
+            const params = new URLSearchParams({
+                types: "url", source: "tencent", id: song.url_id || song.id, br: quality,
+                name: song.name || "", singer: Array.isArray(song.artist) ? song.artist.join(" ") : song.artist || "", album: song.album || "",
+            });
+            return `${API.proxyBaseUrl}?${params}`;
+        }
+        return `${API.getBaseUrl(song.source)}?types=url&id=${song.id}&source=${song.source || "netease"}&br=${quality}&s=${signature}`;
     },
 
     getLyric: (song) => {
         const signature = API.generateSignature();
-        return `${API.baseUrl}?types=lyric&id=${song.lyric_id || song.id}&source=${song.source || "netease"}&s=${signature}`;
+        return `${API.getBaseUrl(song.source)}?types=lyric&id=${song.lyric_id || song.id}&source=${song.source || "netease"}&s=${signature}`;
     },
 
     getPicUrl: (song) => {
         const signature = API.generateSignature();
-        return `${API.baseUrl}?types=pic&id=${song.pic_id}&source=${song.source || "netease"}&size=300&s=${signature}`;
+        return `${API.getBaseUrl(song.source)}?types=pic&id=${song.pic_id}&source=${song.source || "netease"}&size=300&s=${signature}`;
     }
 };
 
@@ -1376,7 +1365,7 @@ bootstrapPersistentStorage();
 
     function getArtworkList(url) {
         // iOS/Safari 建议多尺寸封面；你的 API 已有 pic_id -> pic url（300），这里做兜底多尺寸
-        // 注意：尽量提供 https 链接；你的项目里已有 preferHttpsUrl/buildAudioProxyUrl 工具函数
+        // 注意：尽量提供 https 链接；你的项目里已有 preferHttpsUrl 工具函数
         const src = (typeof preferHttpsUrl === 'function') ? preferHttpsUrl(url) : (url || '');
         // 如果没有封面，用默认封面兜底
         const fallback = '/favicon.png';
@@ -6368,17 +6357,14 @@ async function playSong(song, options = {}) {
         }
 
         const originalAudioUrl = audioData.url;
-        const proxiedAudioUrl = buildAudioProxyUrl(originalAudioUrl);
         const preferredAudioUrl = preferHttpsUrl(originalAudioUrl);
         const candidateAudioUrls = Array.from(
-            new Set([proxiedAudioUrl, preferredAudioUrl, originalAudioUrl].filter(Boolean))
+            new Set([preferredAudioUrl, originalAudioUrl].filter(Boolean))
         );
 
         const primaryAudioUrl = candidateAudioUrls[0] || originalAudioUrl;
 
-        if (proxiedAudioUrl && proxiedAudioUrl !== originalAudioUrl) {
-            debugLog(`音频地址已通过代理转换为 HTTPS: ${proxiedAudioUrl}`);
-        } else if (preferredAudioUrl && preferredAudioUrl !== originalAudioUrl) {
+        if (preferredAudioUrl && preferredAudioUrl !== originalAudioUrl) {
             debugLog(`音频地址由 HTTP 升级为 HTTPS: ${preferredAudioUrl}`);
         }
 
@@ -6776,7 +6762,7 @@ function pickRandomExploreGenre() {
     return EXPLORE_RADAR_GENRES[index];
 }
 
-const EXPLORE_RADAR_SOURCES = ["netease", "kuwo"];
+const EXPLORE_RADAR_SOURCES = ["netease", "tencent"];
 
 function pickRandomExploreSource() {
     if (!Array.isArray(EXPLORE_RADAR_SOURCES) || EXPLORE_RADAR_SOURCES.length === 0) {
@@ -7083,16 +7069,13 @@ async function downloadSong(song, quality = "320") {
         const audioData = await API.fetchJson(audioUrl);
 
         if (audioData && audioData.url) {
-            const proxiedAudioUrl = buildAudioProxyUrl(audioData.url);
             const preferredAudioUrl = preferHttpsUrl(audioData.url);
 
-            if (proxiedAudioUrl !== audioData.url) {
-                debugLog(`下载链接已通过代理转换为 HTTPS: ${proxiedAudioUrl}`);
-            } else if (preferredAudioUrl !== audioData.url) {
+            if (preferredAudioUrl !== audioData.url) {
                 debugLog(`下载链接由 HTTP 升级为 HTTPS: ${preferredAudioUrl}`);
             }
 
-            const downloadUrl = proxiedAudioUrl || preferredAudioUrl || audioData.url;
+            const downloadUrl = preferredAudioUrl || audioData.url;
 
             const link = document.createElement("a");
             link.href = downloadUrl;

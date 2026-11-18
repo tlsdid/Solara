@@ -55,7 +55,21 @@ for (let index = 0; index < tracks.length; index += 1) {
         continue;
     }
 
-    const searchSource = mode === "qq" ? "kuwo" : mode;
+    if (mode === "qq") {
+        const mid = firstString(rawTrack?.songmid, rawTrack?.mid, rawTrack?.url_id, rawTrack?.id);
+        if (!/^[A-Za-z0-9]{10,24}$/.test(mid) || /^\d+$/.test(mid)) {
+            missing.push({ index: index + 1, name: track.name, reason: "missing QQ Music MID", raw: rawTrack });
+            continue;
+        }
+        converted.push(toSolaraSong({
+            id: mid, name: track.name, artist: track.artist, album: track.album,
+            pic_id: firstString(rawTrack?.albummid, rawTrack?.album?.mid, rawTrack?.pic_id),
+            source: "tencent",
+        }));
+        continue;
+    }
+
+    const searchSource = mode;
     const keyword = buildSearchKeyword(track);
     const results = await searchMusic(keyword, searchSource, count);
     const match = pickBestMatch(track, results);
@@ -128,9 +142,8 @@ function printUsage() {
         "  node tools/convert-playlist-to-solara.mjs --url https://music.163.com/playlist?id=123 --mode netease",
         "",
         "Options:",
-        "  --mode qq       Search every input song on Kuwo and output source=kuwo.",
+        "  --mode qq       Use original QQ Music MIDs and output source=tencent.",
         "  --mode netease  Use NetEase IDs directly when present, otherwise search NetEase.",
-        "  --mode kuwo     Search every input song on Kuwo.",
         "  --output path   Solara JSON output path.",
         "  --missing path  Not-found report path.",
     ].join("\n"));
@@ -140,7 +153,6 @@ function normalizeMode(value) {
     const normalized = String(value || "").trim().toLowerCase();
     if (normalized === "qq" || normalized === "tencent") return "qq";
     if (normalized === "netease" || normalized === "163") return "netease";
-    if (normalized === "kuwo") return "kuwo";
     throw new Error(`Unsupported mode: ${value}`);
 }
 
@@ -538,7 +550,7 @@ function toSolaraSong(song) {
         name: firstString(song.name),
         artist: normalizeArtists(song.artist, song.artists, song.singer),
         album: normalizeAlbum(song.album),
-        pic_id: firstString(song.pic_id, song.picId, song.pic, id),
+        pic_id: firstString(song.pic_id, song.picId, song.pic, song.source === "tencent" ? "" : id),
         url_id: firstString(song.url_id, id),
         lyric_id: firstString(song.lyric_id, id),
         source: firstString(song.source, "netease"),

@@ -50,7 +50,7 @@ Solara 是一个纯网页音乐播放器，适合部署在 Cloudflare Pages 上�
 - 移动端自适应竖屏布局。
 - 浅色 / 深色主题切换。
 - 固定高级灰玻璃拟态主题。
-- 网易云、酷我等来源搜索。
+- 网易云和 QQ 音乐搜索。
 - 歌曲播放、下载、收藏、加入播放列表。
 - 播放列表、收藏列表、自定义歌单管理。
 - 列表内搜索和拖拽排序。
@@ -160,7 +160,6 @@ CREATE TABLE IF NOT EXISTS favorites_store (
 
 - 网易云歌单链接
 - QQ 音乐歌单链接
-- 酷我搜索转换
 - 下载 Solara JSON
 - 下载未匹配报告
 
@@ -176,7 +175,7 @@ CREATE TABLE IF NOT EXISTS favorites_store (
 
 说明：
 
-- QQ 音乐歌单不会直接输出腾讯源，会先读取歌名和歌手，再匹配酷我源歌曲，最终输出格式为 `source: "kuwo"`。
+- QQ 音乐歌单保留原曲 MID，输出 `source: "tencent"`，播放通过星海，歌词通过 QQ 音乐。
 - 无法匹配的歌曲会进入未匹配报告。
 - 转换结果是否能播放取决于目标音乐源是否可用。
 - 推荐优先使用网页转换器处理 QQ 音乐歌单。
@@ -194,12 +193,6 @@ tools/convert-playlist-to-solara.mjs
 
 ```powershell
 node ".\tools\convert-playlist-to-solara.mjs" --url "https://music.163.com/playlist?id=歌单ID" --mode netease
-```
-
-酷我源转换：（这个我没尝试过）
-
-```powershell
-node ".\tools\convert-playlist-to-solara.mjs" --input ".\playlist.json" --mode kuwo
 ```
 
 指定输出文件：
@@ -249,7 +242,7 @@ Remove-Item Env:QQ_MUSIC_COOKIE
 
 不要把 Cookie 写进代码，不要提交到 GitHub。
 
-说明：QQ 音乐歌单不会直接输出 `source: "tencent"`。Solara 当前不使用腾讯播放源，QQ 歌单会尽量匹配酷我源并输出 `source: "kuwo"`。
+说明：QQ 音乐歌单输出 `source: "tencent"`，其中歌曲 ID 使用原曲 MID。
 
 ## 使用方法
 
@@ -377,14 +370,14 @@ Solara 可导入 JSON 的基本结构：
   },
   "items": [
     {
-      "id": "123456789",
+      "id": "003uTaUX3MDGbO",
       "name": "示例歌曲名",
       "artist": ["示例歌手名"],
       "album": "示例专辑名",
-      "pic_id": "120/example/path.jpg",
-      "url_id": "123456789",
-      "lyric_id": "123456789",
-      "source": "kuwo"
+      "pic_id": "",
+      "url_id": "003uTaUX3MDGbO",
+      "lyric_id": "003uTaUX3MDGbO",
+      "source": "tencent"
     }
   ]
 }
@@ -394,12 +387,6 @@ Solara 可导入 JSON 的基本结构：
 
 ```txt
 source: netease
-source: kuwo
-```
-
-QQ 音乐歌单需要转换为酷我源后导入，不应直接使用：
-
-```txt
 source: tencent
 ```
 
@@ -411,59 +398,11 @@ source: tencent
 
 ### QQ 歌单转换后部分歌曲缺失
 
-QQ 歌单会匹配酷我源歌曲。酷我没有对应歌曲或匹配失败时，会进入未匹配报告。
+缺少 QQ 音乐 MID 的曲目会进入未匹配报告。
 
 ### QQ 歌单转换出来不能播放
 
-检查 JSON 中每首歌的 `source`。应为：
-
-```txt
-kuwo
-```
-
-如果是：
-
-```txt
-tencent
-```
-
-说明使用了旧版转换逻辑，需要重新转换。
-
-### 本地脚本读取 QQ 歌单失败
-
-如果出现：
-
-```txt
-check privacy error
-```
-
-说明 QQ 音乐接口要求登录上下文。使用网页转换器，或给本地脚本传入 QQ 音乐 Cookie。
-
-### 多设备数据不同步
-
-检查：
-
-```txt
-Cloudflare Pages → Settings → Functions → Bindings
-```
-
-确认 D1 Binding name 是：
-
-```txt
-DB
-```
-
-再确认 D1 中已创建：
-
-```txt
-playback_store
-favorites_store
-```
-
-### 如何重置本地数据
-
-浏览器开发者工具中清理 localStorage。  
-如果启用了 D1，还需要在 D1 数据库中清理对应 key。
+检查 JSON 中每首歌是否有 `source: "tencent"` 和原曲 MID。旧版酷我歌单可从原始 QQ 歌单重新导入。
 
 ## 致谢
 

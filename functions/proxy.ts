@@ -1,5 +1,6 @@
+import { handleQqMusic } from "./lib/qq-music.ts";
+
 const API_BASE_URL = "https://music-api.gdstudio.xyz/api.php";
-const KUWO_HOST_PATTERN = /(^|\.)kuwo\.cn$/i;
 const SAFE_RESPONSE_HEADERS = ["content-type", "cache-control", "accept-ranges", "content-length", "content-range", "etag", "last-modified", "expires"];
 
 function createCorsHeaders(init?: Headers): Headers {
@@ -27,59 +28,6 @@ function handleOptions(): Response {
       "Access-Control-Allow-Headers": "*",
       "Access-Control-Max-Age": "86400",
     },
-  });
-}
-
-function isAllowedKuwoHost(hostname: string): boolean {
-  if (!hostname) return false;
-  return KUWO_HOST_PATTERN.test(hostname);
-}
-
-function normalizeKuwoUrl(rawUrl: string): URL | null {
-  try {
-    const parsed = new URL(rawUrl);
-    if (!isAllowedKuwoHost(parsed.hostname)) {
-      return null;
-    }
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-      return null;
-    }
-    parsed.protocol = "http:";
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-async function proxyKuwoAudio(targetUrl: string, request: Request): Promise<Response> {
-  const normalized = normalizeKuwoUrl(targetUrl);
-  if (!normalized) {
-    return new Response("Invalid target", { status: 400 });
-  }
-
-  const init: RequestInit = {
-    method: request.method,
-    headers: {
-      "User-Agent": request.headers.get("User-Agent") ?? "Mozilla/5.0",
-      "Referer": "https://www.kuwo.cn/",
-    },
-  };
-
-  const rangeHeader = request.headers.get("Range");
-  if (rangeHeader) {
-    (init.headers as Record<string, string>)["Range"] = rangeHeader;
-  }
-
-  const upstream = await fetch(normalized.toString(), init);
-  const headers = createCorsHeaders(upstream.headers);
-  if (!headers.has("Cache-Control")) {
-    headers.set("Cache-Control", "public, max-age=3600");
-  }
-
-  return new Response(upstream.body, {
-    status: upstream.status,
-    statusText: upstream.statusText,
-    headers,
   });
 }
 
@@ -125,10 +73,12 @@ export async function onRequest({ request }: { request: Request }): Promise<Resp
   }
 
   const url = new URL(request.url);
-  const target = url.searchParams.get("target");
-
-  if (target) {
-    return proxyKuwoAudio(target, request);
+  const source = url.searchParams.get("source");
+  if (source === "tencent" || source === "qq") {
+    return handleQqMusic(url.searchParams);
+  }
+  if (source === "kuwo") {
+    return Response.json({ error: "酷我音乐源已移除" }, { status: 410 });
   }
 
   return proxyApiRequest(url, request);

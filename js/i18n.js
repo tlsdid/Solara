@@ -2,7 +2,7 @@
     const translations = {
         // common
         "网易云音乐": "Netease Music",
-        "酷我音乐": "Kuwo Music",
+        "QQ 音乐": "QQ Music",
         "JOOX音乐": "JOOX Music",
         "哔哩哔哩": "Bilibili",
         "极高音质": "High Quality",

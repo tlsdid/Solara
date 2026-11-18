@@ -8,7 +8,7 @@ const FETCH_TIMEOUT_MS = 7000;
 const SEARCH_CONCURRENCY = 4;
 const GD_VERSION = "2025.11.4";
 
-type SourceMode = "auto" | "netease" | "qq" | "kuwo";
+type SourceMode = "auto" | "netease" | "qq";
 
 export const onRequestPost: PagesFunction = async ({ request }) => {
   try {
@@ -42,7 +42,7 @@ export const onRequestPost: PagesFunction = async ({ request }) => {
         exportedAt: new Date().toISOString(),
         itemCount: converted.length,
         sourceMode,
-        outputSource: sourceMode === "qq" ? "kuwo" : sourceMode,
+        outputSource: sourceMode === "qq" ? "tencent" : sourceMode,
         missingCount: missing.length,
         inputUrl,
       },
@@ -54,8 +54,8 @@ export const onRequestPost: PagesFunction = async ({ request }) => {
       payload,
       missing: { missing },
       filenames: {
-        playlist: `solara-playlist-${sourceMode}-to-${sourceMode === "qq" ? "kuwo" : sourceMode}-${stamp}.json`,
-        missing: `solara-playlist-${sourceMode}-to-${sourceMode === "qq" ? "kuwo" : sourceMode}-${stamp}-not-found.json`,
+        playlist: `solara-playlist-${sourceMode}-to-${sourceMode === "qq" ? "tencent" : sourceMode}-${stamp}.json`,
+        missing: `solara-playlist-${sourceMode}-to-${sourceMode === "qq" ? "tencent" : sourceMode}-${stamp}-not-found.json`,
       },
       summary: {
         total: tracks.length,
@@ -110,6 +110,21 @@ async function convertOneTrack(rawTrack: any, index: number, sourceMode: Exclude
     };
   }
 
+  if (sourceMode === "qq") {
+    const mid = firstString(rawTrack?.songmid, rawTrack?.mid, rawTrack?.url_id, rawTrack?.id);
+    if (!/^[A-Za-z0-9]{10,24}$/.test(mid) || /^\d+$/.test(mid)) {
+      return { missing: { index: index + 1, name: track.name, reason: "missing QQ Music MID", raw: rawTrack } };
+    }
+    return { converted: toSolaraSong({
+      id: mid,
+      name: track.name,
+      artist: track.artist,
+      album: track.album,
+      pic_id: firstString(rawTrack?.albummid, rawTrack?.album?.mid, rawTrack?.pic_id),
+      source: "tencent",
+    }) };
+  }
+
   if (sourceMode === "netease" && track.id && isLikelyNumericId(track.id)) {
     return {
       converted: toSolaraSong({
@@ -125,7 +140,7 @@ async function convertOneTrack(rawTrack: any, index: number, sourceMode: Exclude
     };
   }
 
-  const targetSource = sourceMode === "qq" ? "kuwo" : sourceMode;
+  const targetSource = sourceMode;
   const keywords = buildSearchKeywords(track);
   const tried: any[] = [];
   let best: { song: any; score: number; keyword: string; resultCount: number } | null = null;
@@ -178,7 +193,7 @@ async function convertOneTrack(rawTrack: any, index: number, sourceMode: Exclude
   return {
     missing: {
       index: index + 1,
-      reason: tried.some((item) => item.error) ? "search failed or no reliable kuwo match" : "not found on kuwo",
+      reason: tried.some((item) => item.error) ? "search failed or no reliable match" : "not found",
       tried,
       name: track.name,
       artist: track.artist,
@@ -212,14 +227,12 @@ function normalizeMode(value: string): SourceMode {
   if (normalized === "auto") return "auto";
   if (normalized === "qq" || normalized === "tencent") return "qq";
   if (normalized === "netease" || normalized === "163") return "netease";
-  if (normalized === "kuwo") return "kuwo";
 
   throw new Error(`不支持的来源：${value}`);
 }
 
 function detectModeFromUrl(url: string): Exclude<SourceMode, "auto"> {
   if (isQqMusicUrl(url)) return "qq";
-  if (/kuwo|kuwo\.cn/i.test(url)) return "kuwo";
   return "netease";
 }
 
@@ -714,10 +727,10 @@ function toSolaraSong(song: any) {
     name: firstString(song.name),
     artist: normalizeArtists(song.artist, song.artists, song.singer),
     album: normalizeAlbum(song.album),
-    pic_id: firstString(song.pic_id, song.picId, song.pic, id),
+    pic_id: firstString(song.pic_id, song.picId, song.pic, song.source === "tencent" ? "" : id),
     url_id: firstString(song.url_id, id),
     lyric_id: firstString(song.lyric_id, id),
-    source: "kuwo",
+    source: song.source || "netease",
   };
 }
 
