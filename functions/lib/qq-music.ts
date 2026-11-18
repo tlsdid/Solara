@@ -77,6 +77,36 @@ export function qqAlbumCover(mid: string): string {
     : "";
 }
 
+async function getXinghaiPlayback(query: URLSearchParams) {
+  const playbackUrl = `${XINGHAI_API}?${query}`;
+  const token = await getToken();
+  let data;
+  try {
+    data = await requestJson(playbackUrl, { ...XINGHAI_HEADERS, "X-Token": token });
+  } catch (error) {
+    if (!(error instanceof Error) || error.message !== "Upstream HTTP 403") throw error;
+    if (session?.token === token) session = undefined;
+    data = await requestJson(playbackUrl, { ...XINGHAI_HEADERS, "X-Token": await getToken() });
+  }
+  if (data.code !== 200 || typeof data.url !== "string" || !/^https?:\/\//.test(data.url)) return null;
+  const audioUrl = new URL(data.url);
+  audioUrl.protocol = "https:";
+  return audioUrl.toString();
+}
+
+async function getQqBackupUrl(mid: string) {
+  const query = new URLSearchParams({ mid, type: "json" });
+  const data = await requestJson(
+    `https://api.xunhuisi.store/API/QQMusic/Song.php?${query}`,
+    { Accept: "application/json", "User-Agent": "Mozilla/5.0" }, 5000,
+  );
+  if (Number(data.code) !== 200 || typeof data.music_url !== "string") return null;
+  const url = new URL(data.music_url);
+  if (!/^https?:$/.test(url.protocol) || !/(^|\.)qqmusic\.qq\.com$/i.test(url.hostname)) return null;
+  url.protocol = "https:";
+  return url.toString();
+}
+
 export async function handleQqMusic(params: URLSearchParams): Promise<Response> {
   const type = params.get("types");
   const id = params.get("id") || "";
@@ -128,22 +158,26 @@ export async function handleQqMusic(params: URLSearchParams): Promise<Response> 
         name: params.get("name") || "", singer: params.get("singer") || "",
         albumName: params.get("album") || "", interval: "",
       });
-      const playbackUrl = `${XINGHAI_API}?${query}`;
-      const token = await getToken();
-      let data;
+      const qualities = quality === "flac" ? ["flac", "320k", "128k"]
+        : quality === "320k" ? ["320k", "128k"] : ["128k"];
+      for (const candidate of qualities) {
+        query.set("quality", candidate);
+        try {
+          const url = await getXinghaiPlayback(query);
+          if (url) return Response.json({ url, quality: candidate, fallback: candidate !== quality });
+        } catch {
+          break;
+        }
+      }
+
+      let backupUrl;
       try {
-        data = await requestJson(playbackUrl, { ...XINGHAI_HEADERS, "X-Token": token });
-      } catch (error) {
-        if (!(error instanceof Error) || error.message !== "Upstream HTTP 403") throw error;
-        if (session?.token === token) session = undefined;
-        data = await requestJson(playbackUrl, { ...XINGHAI_HEADERS, "X-Token": await getToken() });
+        backupUrl = await getQqBackupUrl(id);
+      } catch {
+        backupUrl = null;
       }
-      if (data.code !== 200 || typeof data.url !== "string" || !/^https?:\/\//.test(data.url)) {
-        throw new Error("星海未返回可用的 QQ 音乐地址");
-      }
-      const audioUrl = new URL(data.url);
-      if (audioUrl.protocol === "http:") audioUrl.protocol = "https:";
-      return Response.json({ url: audioUrl.toString() });
+      if (backupUrl) return Response.json({ url: backupUrl, format: "m4a", fallback: true });
+      return Response.json({ error: "QQ 音乐播放线路暂不可用，请试试其他歌曲" }, { status: 503 });
     }
     return Response.json({ error: "不支持的 QQ 音乐请求" }, { status: 400 });
   } catch (error) {

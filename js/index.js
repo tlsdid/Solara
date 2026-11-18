@@ -880,7 +880,12 @@ const API = {
             });
 
             if (!response.ok) {
-                throw new Error(`Request failed with status ${response.status}`);
+                const error = new Error(`Request failed with status ${response.status}`);
+                const params = new URL(url, window.location.href).searchParams;
+                if (response.status === 503 && params.get("types") === "url" && params.get("source") === "tencent") {
+                    error.userMessage = "QQ 音乐播放线路暂不可用，请试试其他歌曲";
+                }
+                throw error;
             }
 
             const text = await response.text();
@@ -2582,7 +2587,7 @@ async function togglePlayPause() {
             });
         } catch (error) {
             console.error("恢复播放失败:", error);
-            showNotification("播放失败，请稍后重试", "error");
+            showNotification(error.userMessage || "播放失败，请稍后重试", "error");
         }
         return;
     }
@@ -4578,7 +4583,7 @@ async function playSearchResult(index) {
 
     } catch (error) {
         console.error("播放失败:", error);
-        showNotification("播放失败，请稍后重试", "error");
+        showNotification(error.userMessage || "播放失败，请稍后重试", "error");
     }
 }
 
@@ -6304,7 +6309,7 @@ async function playPlaylistSong(index) {
         }
     } catch (error) {
         console.error("播放失败:", error);
-        showNotification("播放失败，请稍后重试", "error");
+        showNotification(error.userMessage || "播放失败，请稍后重试", "error");
     }
 }
 
@@ -6434,7 +6439,9 @@ async function playSong(song, options = {}) {
             throw lastAudioError || new Error('音频加载失败');
         }
 
-        if (usedFallbackAudio) {
+        if (audioData.fallback) {
+            showNotification('已切换到可播放的 QQ 音乐线路或音质', 'warning');
+        } else if (usedFallbackAudio) {
             debugLog(`已回退至备用音频地址: ${selectedAudioUrl}`);
             showNotification('主音频加载失败，已切换到备用音源', 'warning');
         }
@@ -6733,7 +6740,7 @@ async function playOnlineSong(index) {
         updatePlayModeUI();
     } catch (error) {
         console.error("播放失败:", error);
-        showNotification("播放失败，请稍后重试", "error");
+        showNotification(error.userMessage || "播放失败，请稍后重试", "error");
     }
 }
 
@@ -7091,8 +7098,9 @@ async function downloadSong(song, quality = "320") {
 
             const link = document.createElement("a");
             link.href = downloadUrl;
-            const preferredExtension =
-                quality === "999" ? "flac" : quality === "740" ? "ape" : "mp3";
+            const preferredExtension = audioData.format ||
+                (audioData.quality && audioData.quality !== "flac" ? "mp3" :
+                    quality === "999" ? "flac" : quality === "740" ? "ape" : "mp3");
             const fileExtension = (() => {
                 try {
                     const url = new URL(audioData.url);
