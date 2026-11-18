@@ -4,7 +4,7 @@ const XINGHAI_HEADERS = {
   "User-Agent": "lx-music",
   "X-Client": "XingHaiMusicSource/v3.2.18 (unknown)",
 };
-const deviceId = `lx-online-${crypto.randomUUID().slice(0, 8)}`;
+let deviceId: string | undefined;
 let session: { token: string; expires: number } | undefined;
 async function requestJson(url: string, headers: HeadersInit) {
   const response = await fetch(url, { headers, signal: AbortSignal.timeout(8000) });
@@ -14,6 +14,7 @@ async function requestJson(url: string, headers: HeadersInit) {
 
 async function getToken(): Promise<string> {
   if (session && session.expires > Date.now()) return session.token;
+  deviceId ??= `lx-online-${crypto.randomUUID().slice(0, 8)}`;
   const body = await requestJson(
     `${XINGHAI_API}token.php?${new URLSearchParams({ device_id: deviceId })}`,
     XINGHAI_HEADERS,
