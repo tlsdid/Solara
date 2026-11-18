@@ -89,7 +89,25 @@ export async function handleQqMusic(params: URLSearchParams): Promise<Response> 
       return Response.json(await searchQqMusic(keyword, page, count));
     }
 
-    if (type === "pic") return Response.json({ url: qqAlbumCover(id) });
+    if (type === "pic" || type === "pic-image") {
+      const cover = qqAlbumCover(id);
+      if (!cover) return Response.json({ error: "无效的 QQ 音乐专辑 MID" }, { status: 400 });
+      if (type === "pic") {
+        const query = new URLSearchParams({ types: "pic-image", source: "tencent", id });
+        return Response.json({ url: `/proxy?${query}`, paletteUrl: cover });
+      }
+
+      const image = await fetch(cover, {
+        redirect: "error",
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!image.ok || image.headers.get("Content-Type")?.split(";")[0] !== "image/jpeg") {
+        return Response.json({ error: "QQ 音乐封面不可用" }, { status: 502 });
+      }
+      return new Response(image.body, {
+        headers: { "Content-Type": "image/jpeg", "Cache-Control": "private, max-age=3600" },
+      });
+    }
     if (!/^[A-Za-z0-9]{10,24}$/.test(id)) {
       return Response.json({ error: "无效的 QQ 音乐 MID" }, { status: 400 });
     }

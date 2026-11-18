@@ -3850,9 +3850,10 @@ function updateCurrentSongInfo(song, options = {}) {
                         return;
                     }
                     setAlbumCoverImage(imageUrl);
-                    const shouldApplyImmediately = paletteCache.has(imageUrl) ||
-                        (state.currentPaletteImage === imageUrl && state.dynamicPalette);
-                    scheduleDeferredPaletteUpdate(imageUrl, { immediate: shouldApplyImmediately });
+                    const paletteUrl = preferHttpsUrl(data.paletteUrl || imageUrl);
+                    const shouldApplyImmediately = paletteCache.has(paletteUrl) ||
+                        (state.currentPaletteImage === paletteUrl && state.dynamicPalette);
+                    scheduleDeferredPaletteUpdate(paletteUrl, { immediate: shouldApplyImmediately });
                 };
                 img.onerror = () => {
                     if (state.currentSong !== song) {
