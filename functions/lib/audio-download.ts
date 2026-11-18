@@ -22,7 +22,8 @@ export async function sendAudioDownload(audioUrl: string, params: URLSearchParam
     return Response.json({ error: "下载音频失败，请稍后重试", upstreamStatus: upstream.status, contentType }, { status: 502 });
   }
 
-  const extension = ({
+  const extensionFromPath = /\.(mp3|flac|ape|m4a|aac)$/i.exec(url.pathname)?.[1].toLowerCase();
+  const extension = extensionFromPath || ({
     "audio/mpeg": "mp3", "audio/mp4": "m4a", "audio/aac": "aac",
     "audio/flac": "flac", "audio/x-flac": "flac", "audio/ape": "ape", "audio/x-ape": "ape",
   } as Record<string, string>)[contentType] || format;

@@ -7079,23 +7079,56 @@ function scrollToCurrentLyric(element, containerOverride) {
 
 }
 
-function downloadSong(song, quality = "320") {
+async function downloadSong(song, quality = "320") {
+    const isQq = ["tencent", "qq"].includes(song.source);
+    const artist = Array.isArray(song.artist) ? song.artist.join(", ") : song.artist || "";
     const params = new URLSearchParams({
         types: "download",
-        source: song.source === "qq" ? "tencent" : song.source || "netease",
+        source: isQq ? "tencent" : song.source || "netease",
         id: song.url_id || song.id,
         br: quality,
         name: song.name || "",
-        singer: Array.isArray(song.artist) ? song.artist.join(", ") : song.artist || "",
+        singer: artist,
         album: song.album || "",
     });
-    const link = document.createElement("a");
-    link.href = `${API.proxyBaseUrl}?${params}`;
-    link.download = "";
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
     showNotification("正在准备下载...");
+
+    try {
+        let response;
+        if (isQq) {
+            try {
+                const audio = await API.fetchJson(API.getSongUrl(song, quality));
+                if (audio?.url) response = await fetch(preferHttpsUrl(audio.url), { credentials: "omit" });
+            } catch (error) {
+                console.warn("QQ 音乐 CDN 下载失败，尝试站内下载:", error);
+            }
+        }
+        if (!response?.ok) response = await fetch(`${API.proxyBaseUrl}?${params}`);
+        if (!response.ok) throw new Error(`下载请求失败 (${response.status})`);
+
+        const blob = await response.blob();
+        const prefix = new Uint8Array(await blob.slice(0, 12).arrayBuffer());
+        const signature = String.fromCharCode(...prefix);
+        const extension = signature.startsWith("fLaC") ? "flac"
+            : signature.startsWith("MAC ") ? "ape"
+            : signature.slice(4, 8) === "ftyp" ? "m4a"
+            : signature.startsWith("ID3") || (prefix[0] === 0xff && (prefix[1] & 0xe0) === 0xe0) ? "mp3"
+            : null;
+        if (!extension) throw new Error("上游未返回可识别的音频文件");
+
+        const objectUrl = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = objectUrl;
+        link.download = `${[song.name, artist].filter(Boolean).join(" - ") || "Solara"}.${extension}`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 30000);
+        showNotification("下载已开始", "success");
+    } catch (error) {
+        console.error("下载失败:", error);
+        showNotification("下载失败，请稍后重试", "error");
+    }
 }
 
 // 修复：移动端视图切换
