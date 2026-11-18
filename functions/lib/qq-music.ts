@@ -1,3 +1,5 @@
+import { sendAudioDownload } from "./audio-download.ts";
+
 const QQ_ORIGIN = "https://y.qq.com/";
 const XINGHAI_API = "https://yy.zddyr.top/lx/api/";
 const XINGHAI_HEADERS = {
@@ -107,36 +109,6 @@ async function getQqBackupUrl(mid: string) {
   return url.toString();
 }
 
-async function sendQqDownload(audioUrl: string, params: URLSearchParams, format: string) {
-  const url = new URL(audioUrl);
-  if (url.protocol !== "https:" || !/(^|\.)qqmusic\.qq\.com$/i.test(url.hostname)) {
-    return Response.json({ error: "QQ 音乐没有提供可下载的音频" }, { status: 502 });
-  }
-  const upstream = await fetch(url, { redirect: "manual", signal: AbortSignal.timeout(15000) });
-  const contentType = upstream.headers.get("Content-Type")?.split(";")[0] || "";
-  if (!upstream.ok || !contentType.startsWith("audio/") || !upstream.body) {
-    await upstream.body?.cancel();
-    return Response.json({ error: "下载音频失败，请稍后重试" }, { status: 502 });
-  }
-
-  const extension = ({
-    "audio/mpeg": "mp3", "audio/mp4": "m4a", "audio/aac": "aac",
-    "audio/flac": "flac", "audio/x-flac": "flac",
-  } as Record<string, string>)[contentType] || format;
-  const name = [params.get("name"), params.get("singer")].filter(Boolean).join(" - ") || "QQ Music";
-  const filename = `${name.replace(/[\x00-\x1f\x7f/\\:*?"<>|]/g, "_").trim().slice(0, 160)}.${extension}`;
-  const encodedName = encodeURIComponent(filename).replace(/['()*]/g, (c) => `%${c.charCodeAt(0).toString(16)}`);
-  const headers = new Headers({
-    "Content-Type": extension === "flac" ? "audio/flac" : contentType,
-    "Content-Disposition": `attachment; filename="QQ Music.${extension}"; filename*=UTF-8''${encodedName}`,
-    "Cache-Control": "private, no-store",
-    "X-Content-Type-Options": "nosniff",
-  });
-  const length = upstream.headers.get("Content-Length");
-  if (length && !upstream.headers.get("Content-Encoding")) headers.set("Content-Length", length);
-  return new Response(upstream.body, { headers });
-}
-
 export async function handleQqMusic(params: URLSearchParams): Promise<Response> {
   const type = params.get("types");
   const id = params.get("id") || "";
@@ -196,7 +168,7 @@ export async function handleQqMusic(params: URLSearchParams): Promise<Response> 
           const url = await getXinghaiPlayback(query);
           if (url) {
             if (type === "download") {
-              const download = await sendQqDownload(url, params, candidate === "flac" ? "flac" : "mp3");
+              const download = await sendAudioDownload(url, params, candidate === "flac" ? "flac" : "mp3", "qq");
               if (download.ok) return download;
               await download.body?.cancel();
               continue;
@@ -215,7 +187,7 @@ export async function handleQqMusic(params: URLSearchParams): Promise<Response> 
         backupUrl = null;
       }
       if (backupUrl) {
-        if (type === "download") return sendQqDownload(backupUrl, params, "m4a");
+        if (type === "download") return sendAudioDownload(backupUrl, params, "m4a", "qq");
         return Response.json({ url: backupUrl, format: "m4a", fallback: true });
       }
       return Response.json({ error: "QQ 音乐播放线路暂不可用，请试试其他歌曲" }, { status: 503 });

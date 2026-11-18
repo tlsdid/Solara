@@ -7079,67 +7079,23 @@ function scrollToCurrentLyric(element, containerOverride) {
 
 }
 
-// 修复：下载歌曲
-async function downloadSong(song, quality = "320") {
-    try {
-        showNotification("正在准备下载...");
-
-        const audioUrl = API.getSongUrl(song, quality);
-        if (["tencent", "qq"].includes(song.source)) {
-            const downloadUrl = new URL(audioUrl, window.location.href);
-            downloadUrl.searchParams.set("types", "download");
-            const link = document.createElement("a");
-            link.href = downloadUrl.href;
-            link.download = "";
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            return;
-        }
-
-        const audioData = await API.fetchJson(audioUrl);
-
-        if (audioData && audioData.url) {
-            const preferredAudioUrl = preferHttpsUrl(audioData.url);
-
-            if (preferredAudioUrl !== audioData.url) {
-                debugLog(`下载链接由 HTTP 升级为 HTTPS: ${preferredAudioUrl}`);
-            }
-
-            const downloadUrl = preferredAudioUrl || audioData.url;
-
-            const link = document.createElement("a");
-            link.href = downloadUrl;
-            const preferredExtension = audioData.format ||
-                (audioData.quality && audioData.quality !== "flac" ? "mp3" :
-                    quality === "999" ? "flac" : quality === "740" ? "ape" : "mp3");
-            const fileExtension = (() => {
-                try {
-                    const url = new URL(audioData.url);
-                    const pathname = url.pathname || "";
-                    const match = pathname.match(/\.([a-z0-9]+)$/i);
-                    if (match) {
-                        return match[1];
-                    }
-                } catch (error) {
-                    console.warn("无法从下载链接中解析扩展名:", error);
-                }
-                return preferredExtension;
-            })();
-            link.download = `${song.name} - ${Array.isArray(song.artist) ? song.artist.join(", ") : song.artist}.${fileExtension}`;
-            link.target = "_blank";
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-
-            showNotification("下载已开始", "success");
-        } else {
-            throw new Error("无法获取下载地址");
-        }
-    } catch (error) {
-        console.error("下载失败:", error);
-        showNotification("下载失败，请稍后重试", "error");
-    }
+function downloadSong(song, quality = "320") {
+    const params = new URLSearchParams({
+        types: "download",
+        source: song.source === "qq" ? "tencent" : song.source || "netease",
+        id: song.url_id || song.id,
+        br: quality,
+        name: song.name || "",
+        singer: Array.isArray(song.artist) ? song.artist.join(", ") : song.artist || "",
+        album: song.album || "",
+    });
+    const link = document.createElement("a");
+    link.href = `${API.proxyBaseUrl}?${params}`;
+    link.download = "";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    showNotification("正在准备下载...");
 }
 
 // 修复：移动端视图切换
